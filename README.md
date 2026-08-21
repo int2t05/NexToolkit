@@ -1,72 +1,100 @@
 # NexToolkit
 
-> 开源、纯本地、轻量快捷的通用工具集。Tauri 桌面 GUI + 独立 CLI,跨平台,纯 Rust 核心。
+> 开源、纯本地、轻量快捷的通用工具集。Tauri 桌面 GUI + 独立 CLI,跨平台,纯 Rust 核心。文件不离本机。
 
-## 为什么造
+## 功能
 
-市面无单一本地开源工具能同时覆盖"开发者编码工具 + 全格式转换":编码工具箱(DevToys/CyberChef)强编码弱媒体,格式引擎(FFmpeg/Pandoc)强媒体弱编码;在线服务(freeconvert)以数据上云换一站式,代价是隐私。NexToolkit 用 Tauri+Rust 自研填补此缺口。
+32 个工具,7 组:编解码、格式转换、格式化、生成器、文本、加密、网络/时间。CLI 与 GUI 共享同一核心库,行为一致。
 
-## 特性
+## 架构
 
-- **纯本地** — 文件不离本机,无网络上报,无大小限制。
-- **轻量** — CLI 单二进制 <8MB,GUI 便携包 <20MB,秒启动。
-- **双入口** — CLI(脚本/CI 友好,headless)+ GUI(可视化)共享同一核心库,行为一致。
-- **跨平台** — Windows / macOS / Linux。
+```mermaid
+flowchart TD
+  CORE["nextool-core · 纯 Rust 逻辑"] --> CLI["nextool-cli · clap"]
+  CORE --> GUI["nextool-gui · Tauri command"]
+  GUI <-->|"invoke"| FE["Svelte 5 前端"]
+```
 
-## 工具矩阵(共 32 个)
+- **core**:纯逻辑,无 UI/IO 依赖,可独立单测。
+- **cli**:clap 子命令,参数/stdin 输入,headless 可用。
+- **gui**:Tauri command 薄封装,前端 Svelte 5。
+- 详见 [docs/tech.md](docs/tech.md) 与 [docs/flow.md](docs/flow.md)。
 
-| 分组 | 工具 |
-|---|---|
-| Encoders/Decoders | base64 · url · html · hex · jwt |
-| Converters | json-yaml · json-toml · json-csv · md-html · numbase |
-| Formatters | json-fmt · sql-fmt · xml-fmt · css-min |
-| Generators | hash · hmac · uuid · password · lorem · qr |
-| Text | case · sort-dedup · reverse · regex · diff |
-| Crypto | aes-gcm · rsa · kdf |
-| Net/Time | ipcalc · timestamp · cron · dns |
+## 安装
 
-## 使用(CLI)
+下载 [Release](https://github.com/int2t05/NexToolkit/releases) 产物:CLI 单二进制(linux/macos/windows)或 GUI 安装包(msi/nsis/deb/AppImage/dmg)。或源码构建:
 
 ```bash
+cargo build -p nextool-cli --release   # CLI
+npm install && npm run tauri build      # GUI
+```
+
+## CLI 用法
+
+结构:`nextool <分组> <工具> [模式/参数]`。输入可来自参数或 stdin(管道友好)。成功退出 0,失败非零 + stderr。
+
+```bash
+# 编解码
 nextool encode base64 encode "Hello"          # SGVsbG8=
-echo -n "Man" | nextool encode base64 encode  # TWFu(stdin)
-nextool encode base64 decode "SGVsbG8="       # Hello
+echo -n "Man" | nextool encode base64 encode  # stdin
+
+# 转换
+echo '{"a":1}' | nextool convert json-yaml to
+nextool convert numbase 16 10 ff              # 255
+
+# 格式化
+echo '{"a":1}' | nextool format json-fmt
+
+# 生成器
 nextool generate hash sha256 abc
+nextool generate uuid-v4
+nextool generate password --length 16 --upper --digits
+
+# 文本
+nextool text case snake "Hello World"         # hello_world
+nextool text regex-match '\d+' "a12b3"
+
+# 加密
 nextool crypto aes-encrypt --password pw "Secret"
-nextool --help
+nextool crypto rsa-keygen 2048
+
+# 网络/时间
+nextool net-time ipcalc 192.168.1.5/24
+nextool net-time cron-next "0 * * * * *" --count 3
+nextool net-time dns A example.com
 ```
 
-## 使用(GUI)
+工具全集与参数详见 [docs/api.md](docs/api.md)。
 
-下载 Release 的安装包/便携包,或本地启动:
+## GUI
+
+下载安装包,或开发模式:`npm install && npm run tauri dev`。左侧七组导航 + 搜索,右侧参数表单 + 输入输出 + 复制,中英双语,暗色主题。
+
+## 测试与质量
 
 ```bash
-npm install
-npm run tauri dev    # 开发模式(热重载)
-npm run tauri build  # 生产构建(产出安装包与便携包)
+cargo test -p nextool-core -p nextool-cli      # 真实数据,无 mock
+cargo clippy -p nextool-core -p nextool-cli -- -D warnings
 ```
 
-## 构建
+core 单测 + CLI 集成测试,CI 三平台编译验证。
 
-```bash
-cargo build -p nextool-cli --release   # CLI 单二进制(~4.5MB)
-npm install && npm run tauri build     # GUI(需 Rust + Node)
-cargo test --workspace                 # 测试(真实数据,无 mock)
-cargo clippy --workspace -- -D warnings
-```
+## 未来方向
+
+- **文件转换(对标 freeconvert)**:图像/归档/PDF 纯 Rust 优先,音视频接 ffmpeg 子进程;支持上传文件,产物落源目录。
+- **引擎层**:重格式转换按需接入,核心包不打包重引擎。
+- **智能层**:Smart Detection(剪贴板自动选工具)、Recipe 流水线(工具链式组合)。
+- **交互**:Ctrl+K 命令面板、收藏、输出语法高亮。
+- 详见 [docs/todo.md](docs/todo.md)。
 
 ## 文档
 
-- [docs/PRD.md](docs/PRD.md) — 产品需求
-- [docs/v0.1/PRD.md](docs/v0.1/PRD.md) — v0.1 版本需求
-- [docs/v0.1/tech.md](docs/v0.1/tech.md) — 技术选型与设计依据
-- [docs/research/](docs/research/) — 竞品调研与对标
-- [docs/audit/](docs/audit/) — 纯净审计报告
-- [CHANGELOG.md](CHANGELOG.md) — 更新日志
-
-## 状态
-
-v0.2.0:CLI + GUI 双入口可用,32 工具,180 测试通过,三平台 Release 产物已发布。重格式转换(音视频/Office/电子书)归后续引擎层。
+- [docs/prd.md](docs/prd.md) — 产品需求
+- [docs/tech.md](docs/tech.md) — 技术与架构
+- [docs/api.md](docs/api.md) — 接口契约
+- [docs/flow.md](docs/flow.md) — 业务流程与数据流
+- [docs/todo.md](docs/todo.md) — 当前不足与未来方向
+- [CONTRIBUTING.md](CONTRIBUTING.md) — 贡献指南
 
 ## 协议
 

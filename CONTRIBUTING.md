@@ -11,8 +11,8 @@
 ```bash
 git checkout -b feat/<功能>
 npm install
-cargo test --workspace          # 测试必须全绿(真实数据,无 mock)
-cargo clippy --workspace --all-targets -- -D warnings
+cargo test -p nextool-core -p nextool-cli          # 测试必须全绿(真实数据,无 mock)
+cargo clippy -p nextool-core -p nextool-cli --all-targets -- -D warnings
 cargo fmt --check --all
 npm run check                   # 前端类型检查
 ```
@@ -32,7 +32,7 @@ npm run check                   # 前端类型检查
 3. `crates/cli/src/<域>_cmd.rs` 加子命令;`main.rs` 注册。
 4. `crates/tauri-app/src/commands.rs` 加 `#[tauri::command]`;`lib.rs` 的 `use` 与 `generate_handler!` 注册。
 5. `src/tools.ts` 加工具元数据(分组/参数 schema)。
-6. 更新 `docs/v0.1/PRD.md` 工具矩阵。
+6. 更新 `docs/prd.md` 工具矩阵与 `docs/api.md` 命令契约。
 
 ## 提交
 
