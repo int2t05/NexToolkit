@@ -1,8 +1,7 @@
 //! nextool-gui 库:Tauri 应用装配
 //!
 //! 注册全部核心工具命令,启动桌面窗口加载前端。
-//! 命令定义在 [`commands`] 模块,此处统一 `use` 后经 `generate_handler!` 注册
-//! (Tauri 2 标准模式,参考 OpenCovibe/src-tauri/src/lib.rs)。
+//! 命令定义在 [`commands`] 模块,此处统一 `use` 后经 `generate_handler!` 注册。
 
 mod commands;
 

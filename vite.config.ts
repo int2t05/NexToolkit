@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 
-// 依据:tauri2-svelte5-shadcn/vite.config.ts —— 显式启用 runes,固定端口,相对基路径
+// 显式启用 runes,固定端口,相对基路径(桌面应用非根域名)
 export default defineConfig({
   plugins: [svelte({ compilerOptions: { runes: true } })],
   clearScreen: false,

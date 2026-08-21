@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TOOLS, GROUP_LABEL, type Group, type Tool, type ToolParam } from './tools';
+  import { TOOLS, GROUP_LABEL, type Group, type Tool } from './tools';
   import { invoke } from './bindings';
 
   let lang: 'zh' | 'en' = $state('zh');

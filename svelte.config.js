@@ -1,6 +1,6 @@
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
-// svelte-check 配置:排除 reference/(本地参考仓库,非项目源码)
+// svelte-check 经 tsconfig.json 的 include 限定到 src/
 export default {
   preprocess: vitePreprocess(),
   compilerOptions: {

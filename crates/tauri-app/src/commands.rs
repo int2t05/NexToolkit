@@ -175,12 +175,10 @@ pub fn password_generate(
     digits: String,
     symbols: String,
 ) -> CmdResult<String> {
-    let any =
-        parse_bool(&upper) || parse_bool(&lower) || parse_bool(&digits) || parse_bool(&symbols);
     let opts = PasswordOpts {
-        upper: any || parse_bool(&upper),
-        lower: any || parse_bool(&lower),
-        digits: any || parse_bool(&digits),
+        upper: parse_bool(&upper),
+        lower: parse_bool(&lower),
+        digits: parse_bool(&digits),
         symbols: parse_bool(&symbols),
     };
     Ok(nextool_core::password_generate(length, &opts)?)
