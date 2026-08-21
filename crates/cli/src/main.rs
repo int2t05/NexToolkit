@@ -3,6 +3,7 @@
 //! clap 解析子命令后调用 nextool-core,输出格式化归本层。
 //! 输入可来自参数或 stdin(管道友好)。命令按域分文件模块,避免单巨型入口。
 
+mod archive_cmd;
 mod convert_cmd;
 mod crypto_cmd;
 mod encode_cmd;
@@ -14,6 +15,7 @@ mod text_cmd;
 
 use clap::{Parser, Subcommand};
 
+use archive_cmd::FileConvArgs;
 use convert_cmd::ConvertArgs;
 use crypto_cmd::CryptoArgs;
 use encode_cmd::EncodeArgs;
@@ -46,6 +48,8 @@ enum Command {
     Crypto(CryptoArgs),
     /// 网络/时间:ipcalc/timestamp/cron/dns
     NetTime(NetTimeArgs),
+    /// 文件转换:归档解压/压缩/转换
+    FileConv(FileConvArgs),
 }
 
 fn main() {
@@ -58,6 +62,7 @@ fn main() {
         Command::Text(args) => text_cmd::run(args),
         Command::Crypto(args) => crypto_cmd::run(args),
         Command::NetTime(args) => nettime_cmd::run(args),
+        Command::FileConv(args) => archive_cmd::run(args),
     };
     match result {
         Ok(()) => {}

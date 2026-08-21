@@ -173,3 +173,161 @@ fn timestamp_roundtrip() {
         .success()
         .stdout("1700000000\n");
 }
+
+// ---- 文件转换:归档(真实文件 IO,临时目录,禁止 mock)----
+
+use std::fs;
+use tempfile::tempdir;
+
+#[test]
+fn help_lists_fileconv_domain() {
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("file-conv"));
+}
+
+#[test]
+fn archive_compress_then_list_zip() {
+    let dir = tempdir().unwrap();
+    let a = dir.path().join("a.txt");
+    fs::write(&a, "hello").unwrap();
+    let b = dir.path().join("b.txt");
+    fs::write(&b, "world").unwrap();
+
+    // 压缩为 zip(输出到第一个文件旁:a.zip)
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "compress", "zip", "a.txt", "b.txt"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("已创建归档"));
+
+    let zip = dir.path().join("a.zip");
+    assert!(zip.exists(), "产物应落源文件所在目录");
+
+    // 列出 zip 内容
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "list"])
+        .arg(&zip)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("a.txt"))
+        .stdout(predicate::str::contains("b.txt"));
+}
+
+#[test]
+fn archive_extract_writes_files_to_source_dir() {
+    let dir = tempdir().unwrap();
+    // 先造一个 zip
+    let a = dir.path().join("a.txt");
+    fs::write(&a, "hello").unwrap();
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "compress", "zip", "a.txt"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    let zip = dir.path().join("a.zip");
+
+    // 在子目录解压,避免与源 a.txt 同级干扰
+    let sub = dir.path().join("sub");
+    fs::create_dir(&sub).unwrap();
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "extract"])
+        .arg(&zip)
+        .arg("--output-dir")
+        .arg(sub.join("out"))
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("已解压"));
+
+    let extracted = sub.join("out").join("a.txt");
+    assert!(extracted.exists(), "解压应写出文件");
+    assert_eq!(fs::read_to_string(&extracted).unwrap(), "hello");
+}
+
+#[test]
+fn archive_convert_zip_to_tar() {
+    let dir = tempdir().unwrap();
+    let a = dir.path().join("a.txt");
+    fs::write(&a, "data").unwrap();
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "compress", "zip", "a.txt"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    let zip = dir.path().join("a.zip");
+
+    // 转 tar(输出到源文件旁:a.tar)
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "convert"])
+        .arg(&zip)
+        .arg("tar")
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let tar = dir.path().join("a.tar");
+    assert!(tar.exists(), "转换产物应落源文件所在目录");
+
+    // 列出 tar 验证内容
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "list"])
+        .arg(&tar)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("a.txt"));
+}
+
+#[test]
+fn archive_extract_collision_appends_suffix() {
+    let dir = tempdir().unwrap();
+    // 造两个同名 a.txt 的不同内容 zip,解压第二次应产生 _extracted(1)
+    let mk = |name: &str| {
+        let p = dir.path().join(name);
+        fs::write(&p, name).unwrap();
+        p
+    };
+    let a1 = mk("a.txt");
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "compress", "zip", "a.txt"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    let zip = dir.path().join("a.zip");
+
+    // 第一次解压:默认 a_extracted
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "extract"])
+        .arg(&zip)
+        .current_dir(dir.path())
+        .assert()
+        .success();
+    let first = dir.path().join("a_extracted").join("a.txt");
+    assert!(first.exists());
+
+    // 第二次解压:碰撞 → a_extracted(1)
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "archive", "extract"])
+        .arg(&zip)
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("a_extracted(1)"));
+
+    let second = dir.path().join("a_extracted(1)").join("a.txt");
+    assert!(second.exists(), "碰撞应追加 (1) 后缀");
+    let _ = a1;
+}

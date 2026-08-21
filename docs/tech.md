@@ -17,12 +17,16 @@
 
 ```mermaid
 flowchart TD
-  CORE["crates/core<br/>nextool-core: 纯逻辑"]
+  CORE["crates/core<br/>nextool-core: 纯逻辑(文本域)"]
+  FC["crates/fileconv<br/>nextool-fileconv: 文件转换(字节域)"]
   CLI["crates/cli<br/>nextool-cli: clap bin"]
   GUI["crates/tauri-app<br/>nextool-gui: Tauri command"]
   FE["src/<br/>Svelte 5 前端"]
+  CORE --> FC
   CORE --> CLI
+  FC --> CLI
   CORE --> GUI
+  FC --> GUI
   GUI <-->|"invoke / event"| FE
 ```
 
@@ -30,14 +34,22 @@ flowchart TD
 NexToolkit/
 ├── Cargo.toml                # workspace + 共享 release profile
 ├── crates/
-│   ├── core/                 # 纯逻辑:按域分模块,可独立单测
-│   ├── cli/                  # clap 子命令,调 core;tests/cli_smoke.rs 集成测试
+│   ├── core/                 # 纯逻辑(文本域 &str→String):按域分模块,可独立单测
+│   ├── fileconv/             # 文件转换(字节域 &[u8]→Vec[u8]):archive 纯内存 + fs_util IO 边界
+│   ├── cli/                  # clap 子命令,调 core+fileconv;tests/cli_smoke.rs 集成测试
 │   └── tauri-app/            # Tauri command 薄封装 + tauri.conf.json + capabilities
 ├── src/                      # Svelte 5 前端
 ├── docs/                     # prd / tech / todo / api / flow + audit
 ├── reference/                # 竞品源码(git 忽略,本地分析)
 └── .github/workflows/        # ci.yml + release.yml(三平台)
 ```
+
+## 双域架构
+
+core 为文本域(`&str→String`,47 函数),fileconv 为字节域(`&[u8]→Vec<u8>`)。归档是二进制数据,强制 String 会引入 base64 开销与 UTF-8 错误风险,故字节域独立 crate。fileconv 复用 core 的 `ToolError`(单一错误定义,无新变体),分两层:
+
+- `archive` 模块:纯内存逻辑(解压/压缩/互转/检测/路径计算),可独立单测。
+- `fs_util` 模块:IO 边界,组合纯逻辑 + `std::fs` 落盘(产物落源目录 + 碰撞处理),供 CLI/GUI 共享,避免边界逻辑重复。
 
 ## 模块设计
 
@@ -119,6 +131,9 @@ npm run check                         # svelte-check
 3. **Capabilities 最小权限**:仅 `core:default` + `windows: ["main"]`,CSP 锁紧(`script-src 'self'`)。
 4. **Windows WebView2**:`skip` + 文档说明;不嵌 runtime。
 5. **体积优化**:release profile `lto`/`opt-level="z"`/`codegen-units=1`/`panic="abort"`/`strip`;前端 Svelte。
+6. **fileconv feature gate**:`archive` feature(默认开)条件依赖 `zip`/`tar`/`flate2`;`fs_util` 同 gate(依赖 archive 函数)。纯内存核心可禁用归档独立使用。
+7. **GUI 文件转换**:command 接收路径,后端 `std::fs` 读写(Rust 后端不受 capabilities 约束),仅 `tauri-plugin-dialog` 取路径,无需 fs 插件,capabilities 仅加 `dialog:default` 保持最小权限。
+8. **产物碰撞**:`OpenOptions::create_new(true)` 原子检查无 TOCTOU 竞态,迭代 `_converted`→`(1)`→`(2)` 后缀,不静默覆盖。
 
 ## 依据来源
 

@@ -4,6 +4,7 @@
 
 use nextool_core::ToolError;
 use nextool_core::{CaseMode, HashAlgo, PasswordOpts};
+use nextool_fileconv::ArchiveFormat;
 
 /// 命令错误:序列化为字符串供前端展示
 #[derive(Debug, serde::Serialize)]
@@ -42,6 +43,17 @@ fn parse_case_mode(s: &str) -> CmdResult<CaseMode> {
 
 fn parse_bool(s: &str) -> bool {
     s.eq_ignore_ascii_case("true")
+}
+
+/// 解析归档格式字符串(前端 select 传入)
+fn parse_archive_format(s: &str) -> CmdResult<ArchiveFormat> {
+    Ok(match s {
+        "zip" => ArchiveFormat::Zip,
+        "tar" => ArchiveFormat::Tar,
+        "targz" => ArchiveFormat::TarGz,
+        "gz" => ArchiveFormat::Gz,
+        _ => return Err(CmdError(format!("未知归档格式: {s}"))),
+    })
 }
 
 // 编解码
@@ -279,4 +291,50 @@ pub fn cron_next(input: String, count: usize) -> CmdResult<String> {
 #[tauri::command]
 pub fn dns_lookup(input: String, rtype: String) -> CmdResult<String> {
     Ok(nextool_core::dns_lookup(&input, &rtype)?)
+}
+
+// 文件转换:归档(command 接收路径,委托 fileconv::fs_util 落盘,返回路径或路径列表)
+
+/// 列出归档内文件(每行 `路径\t大小`)
+#[tauri::command]
+pub fn archive_list(path: String) -> CmdResult<String> {
+    let data = std::fs::read(&path).map_err(|e| CmdError(e.to_string()))?;
+    Ok(nextool_fileconv::archive_list(&data)?)
+}
+
+/// 解压归档到目录(默认源文件旁 `_extracted`,碰撞追加 `(n)`);返回写出的文件路径列表
+#[tauri::command]
+pub fn archive_extract(path: String, output_dir: Option<String>) -> CmdResult<Vec<String>> {
+    let (_out_dir, written) = nextool_fileconv::extract_to_dir(&path, output_dir.as_deref())?;
+    Ok(written)
+}
+
+/// 压缩文件为归档(默认输出到第一个文件旁);返回产物路径
+#[tauri::command]
+pub fn archive_compress(
+    paths: Vec<String>,
+    format: String,
+    output: Option<String>,
+) -> CmdResult<String> {
+    let fmt = parse_archive_format(&format)?;
+    Ok(nextool_fileconv::compress_files(
+        &paths,
+        fmt,
+        output.as_deref(),
+    )?)
+}
+
+/// 归档格式互转(默认输出到源文件旁);返回产物路径
+#[tauri::command]
+pub fn archive_convert(
+    path: String,
+    target_format: String,
+    output: Option<String>,
+) -> CmdResult<String> {
+    let fmt = parse_archive_format(&target_format)?;
+    Ok(nextool_fileconv::convert_file(
+        &path,
+        fmt,
+        output.as_deref(),
+    )?)
 }

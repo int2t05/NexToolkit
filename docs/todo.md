@@ -6,8 +6,8 @@
 
 ### 工具覆盖
 
-- **无文件转换入口**:当前 32 工具为文本/字符串处理,无文件上传与二进制转换(对标 freeconvert 的图像/音视频/文档/归档转换缺失)。
-- **无重格式转换**:音视频(ffmpeg)、Office↔PDF(LibreOffice)、电子书(Calibre/pandoc)未实现,属引擎层。
+- **归档转换已实现(zip/tar/gz/tar.gz)**:7z 解压、RAR 解压未做(专有格式)。
+- **图像/音视频/文档转换未实现**:图像(image/resvg)、音视频(ffmpeg)、Office↔PDF(LibreOffice)、电子书(Calibre/pandoc)属引擎层,待接入。
 - **HTTP 探测工具未实现**:原计划 `http` 工具(TLS 用 rustls)未做;dns 已有。
 - **RSA 无签名**:仅 keygen/encrypt/decrypt,无 `rsa_sign`/`rsa_verify`。
 - **JWT 仅解码不验签**:无签名验证。
@@ -62,9 +62,10 @@ flowchart LR
 
 | 格式族 | 引擎 | 纯 Rust | 可行性 |
 |---|---|---|---|
-| 图像(常用栅格/矢量) | `image` / `resvg` | 是 | 高(纳入核心层) |
-| 归档 | `zip` / `tar` / `flate2` / `sevenz-rust` | 是 | 高 |
-| PDF 操作(合并/拆分/压缩/旋转/加密) | `lopdf` | 是 | 高 |
+| 归档(zip/tar/gz) | `zip` / `tar` / `flate2` | 是 | ✓ 已交付 |
+| 归档(7z/RAR) | `sevenz-rust2` / `unrar` | 是/否 | 中(7z 解压待做;RAR 仅解压) |
+| 图像(常用栅格/矢量) | `image` / `resvg` | 是 | 高(待做) |
+| PDF 操作(合并/拆分/压缩/旋转/加密) | `lopdf` | 是 | 高(待做,需 Rust 1.85+) |
 | 音视频 | `ffmpeg`(子进程) | 否 | 中(单二进制、秒启动,体积大) |
 | 图像(HEIC/RAW) | `libheif` / `libraw` | 否 | 中 |
 | Office↔PDF | LibreOffice headless | 否 | 低(500MB+,仅探测系统已装) |
@@ -81,7 +82,9 @@ flowchart TD
   C --> D["Ctrl+K 命令面板 + 收藏"]
   D --> E["ts-rs 类型自动生成"]
   E --> F["RSA 签名/验签 + JWT 验签"]
-  F --> G["文件转换(图像/归档/PDF 优先)"]
+  F --> G["7z 解压 + 图像转换"]
+  G --> H["PDF 工具(lopdf)"]
+  H --> I["音视频(ffmpeg 子进程)"]
 ```
 
 1. **便携 GUI 多平台**:macOS .app / Linux AppImage 便携形态。
@@ -91,7 +94,9 @@ flowchart TD
 5. **收藏**:常用工具收藏持久化,首屏置顶。
 6. **ts-rs**:Rust 结构体 derive `TS`,生成 `src/lib/bindings/`。
 7. **RSA 签名/JWT 验签**:补 `rsa_sign`/`rsa_verify`、JWT 验签。
-8. **文件转换**:图像/归档/PDF 纯 Rust 优先,音视频接 ffmpeg 子进程,产物落源目录。
+8. **7z 解压 + 图像转换**:sevenz-rust2 内存 API + image crate(jpg/png/gif/bmp/webp/tiff/ico),产物落源目录。
+9. **PDF 工具**:lopdf merge/split/rotate/encrypt/decrypt(需 Rust 1.85+)。
+10. **音视频**:ffmpeg 子进程(进度 Channel 流),数据纯本地。
 
 ### 智能层(远期)
 

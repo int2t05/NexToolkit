@@ -85,3 +85,35 @@ flowchart LR
 - **文本工具**(编解码/转换/格式化/文本/生成/网络时间):输入输出均为 UTF-8 字符串,经 `String` 传递。
 - **加密工具**:输入为字符串,密文/哈希以 base64 或十六进制字符串返回(字节流编码为可传输文本)。
 - **DNS 查询**:唯一发真实网络请求的工具(hickory-resolver 同步阻塞),其余工具纯计算无 IO。
+- **文件转换**(归档):字节域 `&[u8]→Vec<u8>`,core/fileconv 纯内存;磁盘读写留 CLI/GUI 边界(fs_util)。
+
+## CLI 归档管道
+
+```mermaid
+flowchart LR
+  PATH["文件路径参数"] --> READ["io::read_bytes_input"]
+  READ --> FC["fileconv::fs_util"]
+  FC --> ARCHIVE["archive 纯内存<br/>extract/create/convert"]
+  ARCHIVE --> COLLIDE["compute_*_path<br/>+ create_new 碰撞"]
+  COLLIDE --> WRITE["写产物到源目录"]
+  WRITE --> STDOUT["stdout 报路径"]
+```
+
+**数据流:** CLI `file-conv archive` 子命令读文件路径→`read_bytes_input` 取字节→委托 `fileconv::fs_util`(extract_to_dir/compress_files/convert_file)。fs_util 调纯内存 `archive_*` 转换,再 `compute_output_path`/`compute_extract_dir` 算产物路径,`create_new` 原子写入源文件所在目录(碰撞迭代后缀)。list 命令仅 `archive_list` 纯内存查看,输出到 stdout。
+
+## GUI 文件转换
+
+```mermaid
+flowchart LR
+  DIALOG["dialog::open 选择文件"] --> PATH["路径"]
+  PATH -->|"invoke(cmd, {path,...})"| CMD["commands.rs #[tauri::command]"]
+  CMD --> FS["fileconv::fs_util<br/>std::fs 读写"]
+  FS --> ARCHIVE["archive 纯内存"]
+  ARCHIVE --> WRITE["落盘源目录 + 碰撞"]
+  WRITE --> RET["返回产物路径"]
+  RET -->|"string / string[]"| UI["前端展示路径"]
+```
+
+**数据流:** 前端 `@tauri-apps/plugin-dialog` 取文件路径(不经 invoke 传大字节)→ invoke 传路径→command 用 `std::fs::read` 取字节(Rust 后端不受 capabilities 约束)→委托 `fileconv::fs_util` 转换落盘→返回产物路径(`String` 或 `Vec<String>`)。前端归一化数组为换行文本展示。capabilities 仅 `dialog:default`(取路径),无 fs 插件,最小权限。
+
+
