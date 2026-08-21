@@ -83,5 +83,21 @@ jobs:
           projectPath: crates/tauri-app
           tagName: ${{ github.ref_name }}
           releaseName: ${{ github.ref_name }}
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
+      # Windows 便携原始 exe(skip WebView2,Win11 默认预装):tauri-action 仅产安装器,此处补便携单文件
+      - name: Locate portable exe
+        if: matrix.platform == 'windows-latest'
+        id: exe
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path target\release -Filter "*.exe" -File | Where-Object { $_.Name -notmatch 'setup|nsis' } | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $exe) { throw "未在 target/release 找到便携 exe" }
+          $name = "NexToolkit-${{ github.ref_name }}-windows-x64-portable.exe"
+          Copy-Item $exe $name
+          echo "name=$name" >> $env:GITHUB_OUTPUT
+      - name: Upload portable exe
+        if: matrix.platform == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.exe.outputs.name }}
