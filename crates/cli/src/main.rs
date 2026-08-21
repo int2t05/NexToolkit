@@ -1,13 +1,28 @@
 //! nextool-cli:NexToolkit 命令行入口
 //!
-//! clap 解析子命令后直接调用 nextool-core,输出格式化归本层。
-//! 输入可来自参数或 stdin(管道友好)。
+//! clap 解析子命令后调用 nextool-core,输出格式化归本层。
+//! 输入可来自参数或 stdin(管道友好)。命令按域分文件模块,避免单巨型入口。
 
-use std::io::{Read, Write};
+mod convert_cmd;
+mod crypto_cmd;
+mod encode_cmd;
+mod format_cmd;
+mod generate_cmd;
+mod io;
+mod nettime_cmd;
+mod text_cmd;
 
 use clap::{Parser, Subcommand};
 
-/// NexToolkit 命令行工具集
+use convert_cmd::ConvertArgs;
+use crypto_cmd::CryptoArgs;
+use encode_cmd::EncodeArgs;
+use format_cmd::FormatArgs;
+use generate_cmd::GenerateArgs;
+use nettime_cmd::NetTimeArgs;
+use text_cmd::TextArgs;
+
+/// NexToolkit:开源本地工具集(纯 Rust,零网络上报)
 #[derive(Parser)]
 #[command(name = "nextool", version, about = "开源本地工具集", long_about = None)]
 struct Cli {
@@ -17,67 +32,38 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Base64 编解码
-    Base64 {
-        /// encode 或 decode
-        mode: Mode,
-        /// 输入文本;省略则读 stdin
-        input: Option<String>,
-    },
-}
-
-#[derive(Clone, Copy, clap::ValueEnum)]
-enum Mode {
-    Encode,
-    Decode,
+    /// 编解码:base64/url/html/hex/jwt
+    Encode(EncodeArgs),
+    /// 格式转换:json-yaml/json-toml/json-csv/md-html/numbase
+    Convert(ConvertArgs),
+    /// 格式化:json/sql/xml 美化压缩、css 压缩
+    Format(FormatArgs),
+    /// 生成器:hash/hmac/uuid/password/lorem/qr
+    Generate(GenerateArgs),
+    /// 文本:case/sort/dedup/reverse/regex/diff
+    Text(TextArgs),
+    /// 加密:aes-gcm/rsa/kdf
+    Crypto(CryptoArgs),
+    /// 网络/时间:ipcalc/timestamp/cron/dns
+    NetTime(NetTimeArgs),
 }
 
 fn main() {
     let cli = Cli::parse();
-    let code = match run(cli) {
-        Ok(()) => 0,
+    let result = match cli.command {
+        Command::Encode(args) => encode_cmd::run(args),
+        Command::Convert(args) => convert_cmd::run(args),
+        Command::Format(args) => format_cmd::run(args),
+        Command::Generate(args) => generate_cmd::run(args),
+        Command::Text(args) => text_cmd::run(args),
+        Command::Crypto(args) => crypto_cmd::run(args),
+        Command::NetTime(args) => nettime_cmd::run(args),
+    };
+    match result {
+        Ok(()) => {}
         Err(e) => {
             eprintln!("错误: {e}");
-            1
-        }
-    };
-    std::process::exit(code);
-}
-
-fn run(cli: Cli) -> Result<(), String> {
-    match cli.command {
-        Command::Base64 { mode, input } => {
-            let input = read_input(input)?;
-            let out = match mode {
-                Mode::Encode => nextool_core::base64_encode(&input),
-                Mode::Decode => nextool_core::base64_decode(&input),
-            }
-            .map_err(|e| e.to_string())?;
-            println!("{out}");
-            Ok(())
+            std::process::exit(1);
         }
     }
-}
-
-/// 读取输入:有参数用参数,否则读 stdin 全部
-fn read_input(input: Option<String>) -> Result<String, String> {
-    match input {
-        Some(s) => Ok(s),
-        None => {
-            let mut buf = String::new();
-            std::io::stdin()
-                .read_to_string(&mut buf)
-                .map_err(|e| e.to_string())?;
-            if buf.is_empty() {
-                return Err("无输入:请提供参数或通过 stdin 传入".into());
-            }
-            Ok(buf)
-        }
-    }
-}
-
-// 防止未用警告(stdout 写出在 println!,此处保留 Write trait 引用)
-#[allow(dead_code)]
-fn _ensure_write() {
-    let _ = std::io::stdout().flush();
 }
