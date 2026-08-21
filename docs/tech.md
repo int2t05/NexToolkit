@@ -50,8 +50,9 @@ core 为文本域(`&str→String`,47 函数),fileconv 为字节域(`&[u8]→Vec<
 
 - `archive` 模块:归档纯内存逻辑(解压/压缩/互转/检测/路径安全),feature gate。
 - `image` 模块:图像纯内存逻辑(格式互转/缩放/检测),feature gate;仅启用常用栅格格式(png/jpeg/gif/bmp/webp/tiff/ico)控制体积。
+- `pdf` 模块:PDF 纯内存逻辑(拆分/旋转/加密/解密/加密检测),feature gate;lopdf default-features=false 去重依赖。
 - `path` 模块:纯字符串路径计算(产物路径 + 碰撞后缀),无 feature gate,各域复用。
-- `fs_util` 模块:IO 边界,组合各域纯逻辑 + `std::fs` 落盘(产物落源目录 + `create_new` 碰撞处理),供 CLI/GUI 共享,避免边界逻辑重复。
+- `fs_util` 模块:IO 边界,组合各域纯逻辑 + `std::fs` 落盘(产物落源目录 + `create_new` 碰撞处理),函数级 feature gate,供 CLI/GUI 共享,避免边界逻辑重复。
 
 ## 模块设计
 

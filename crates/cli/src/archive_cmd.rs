@@ -71,6 +71,43 @@ enum FileConvCmd {
         #[command(subcommand)]
         cmd: ImageCmd,
     },
+    /// PDF 操作:拆分/旋转/加密/解密
+    Pdf {
+        #[command(subcommand)]
+        cmd: PdfCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum PdfCmd {
+    /// 拆分 PDF:每页一个独立 PDF
+    Split {
+        input: String,
+        #[arg(long)]
+        output_dir: Option<String>,
+    },
+    /// 旋转 PDF 所有页 90 度(顺时针)
+    Rotate {
+        input: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 加密 PDF(--password)
+    Encrypt {
+        input: String,
+        #[arg(long)]
+        password: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 解密 PDF(--password)
+    Decrypt {
+        input: String,
+        #[arg(long)]
+        password: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -188,6 +225,40 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                     nextool_fileconv::resize_image_file(&input, width, height, output.as_deref())
                         .map_err(|e| e.to_string())?;
                 println!("已缩放 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Pdf { cmd } => match cmd {
+            PdfCmd::Split { input, output_dir } => {
+                let written = nextool_fileconv::split_pdf(&input, output_dir.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已拆分为 {} 个 PDF", written.len());
+                Ok(())
+            }
+            PdfCmd::Rotate { input, output } => {
+                let out = nextool_fileconv::rotate_pdf(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已旋转 {out}");
+                Ok(())
+            }
+            PdfCmd::Encrypt {
+                input,
+                password,
+                output,
+            } => {
+                let out = nextool_fileconv::encrypt_pdf(&input, &password, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已加密 {out}");
+                Ok(())
+            }
+            PdfCmd::Decrypt {
+                input,
+                password,
+                output,
+            } => {
+                let out = nextool_fileconv::decrypt_pdf(&input, &password, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已解密 {out}");
                 Ok(())
             }
         },

@@ -229,4 +229,33 @@ export const TOOLS: Tool[] = [
     ],
     needsMainInput: false,
   },
+  {
+    id: 'pdf_split', group: 'fileconv', name: 'PDF 拆分', desc: '每页一个 PDF',
+    params: [
+      { key: 'path', label: 'PDF 文件', kind: 'file' },
+      { key: 'outputDir', label: '输出目录', kind: 'text', placeholder: '默认源文件旁' },
+    ],
+    needsMainInput: false,
+  },
+  {
+    id: 'pdf_rotate', group: 'fileconv', name: 'PDF 旋转', desc: '所有页顺时针 90°',
+    params: [{ key: 'path', label: 'PDF 文件', kind: 'file' }],
+    needsMainInput: false,
+  },
+  {
+    id: 'pdf_encrypt', group: 'fileconv', name: 'PDF 加密', desc: '口令加密(AES)',
+    params: [
+      { key: 'path', label: 'PDF 文件', kind: 'file' },
+      { key: 'password', label: '口令', kind: 'password' },
+    ],
+    needsMainInput: false,
+  },
+  {
+    id: 'pdf_decrypt', group: 'fileconv', name: 'PDF 解密', desc: '口令解密',
+    params: [
+      { key: 'path', label: 'PDF 文件', kind: 'file' },
+      { key: 'password', label: '口令', kind: 'password' },
+    ],
+    needsMainInput: false,
+  },
 ];

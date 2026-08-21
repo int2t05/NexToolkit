@@ -21,3 +21,4 @@ assert_cmd = "2"
 predicates = "3"
 tempfile = "3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+lopdf = { version = "0.44", default-features = false }
