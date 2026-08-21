@@ -8,6 +8,7 @@
 
 - **归档转换已实现(zip/tar/gz/tar.gz)**:7z 解压、RAR 解压未做(专有格式)。
 - **图像转换已实现(png/jpg/gif/bmp/webp/tiff/ico 互转+缩放)**:HEIC/RAW/AVIF 未做(需 libheif/libraw)。
+- **PDF 工具已实现(拆分/旋转/加密/解密)**:合并(lopdf 无内置页树合并 API)、压缩优化(需 Ghostscript)、OCR(需 tesseract)未做。
 - **音视频/文档/电子书转换未实现**:音视频(ffmpeg)、Office↔PDF(LibreOffice)、电子书(Calibre/pandoc)属引擎层,待接入。
 - **HTTP 探测工具未实现**:原计划 `http` 工具(TLS 用 rustls)未做;dns 已有。
 - **RSA 无签名**:仅 keygen/encrypt/decrypt,无 `rsa_sign`/`rsa_verify`。
@@ -67,7 +68,8 @@ flowchart LR
 | 归档(7z/RAR) | `sevenz-rust2` / `unrar` | 是/否 | 中(7z 解压待做;RAR 仅解压) |
 | 图像(常用栅格) | `image` | 是 | ✓ 已交付 |
 | 图像(HEIC/RAW/AVIF/矢量) | `libheif` / `libraw` / `resvg` | 否/否/是 | 中(待做) |
-| PDF 操作(合并/拆分/压缩/旋转/加密) | `lopdf` | 是 | 高(待做,需 Rust 1.85+) |
+| PDF 操作(拆分/旋转/加密/解密) | `lopdf` | 是 | ✓ 已交付(1.80 兼容) |
+| PDF 合并/压缩优化/OCR | `lopdf`(合并待研)/Ghostscript/tesseract | 是/否/否 | 中(合并待做;压缩/OCR 外部引擎) |
 | 音视频 | `ffmpeg`(子进程) | 否 | 中(单二进制、秒启动,体积大) |
 | 图像(HEIC/RAW) | `libheif` / `libraw` | 否 | 中 |
 | Office↔PDF | LibreOffice headless | 否 | 低(500MB+,仅探测系统已装) |

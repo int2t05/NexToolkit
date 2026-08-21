@@ -147,6 +147,79 @@ pub fn resize_image_file(
     }
 }
 
+// ---- PDF IO(pdf feature)----
+
+/// 拆分 PDF:每页一个独立 PDF,输出到源文件旁 `{stem}_split_{n}.pdf`,返回产物路径列表
+#[cfg(feature = "pdf")]
+pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String>> {
+    let data = std::fs::read(input)?;
+    let parts = crate::pdf_split(&data)?;
+    if parts.is_empty() {
+        return Ok(Vec::new());
+    }
+    let dir = match output_dir {
+        Some(d) => {
+            std::fs::create_dir_all(d)?;
+            d.to_string()
+        }
+        None => resolve_extract_dir(input, None)?,
+    };
+    let stem = Path::new(input)
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "split".into());
+    let mut written = Vec::with_capacity(parts.len());
+    for (i, part) in parts.iter().enumerate() {
+        // 碰撞:_split_0 → _split_0(1) ...
+        let base = format!("{dir}/{}_split_{}", stem, i + 1);
+        let path = write_bytes_safe(part, &format!("{base}.pdf"), "pdf")?;
+        written.push(path);
+    }
+    Ok(written)
+}
+
+/// 旋转 PDF 并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn rotate_pdf(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = crate::pdf_rotate(&data)?;
+    match output {
+        Some(o) => {
+            write_bytes_create_new(&out_data, o)?;
+            Ok(o.to_string())
+        }
+        None => write_bytes_safe(&out_data, input, "pdf"),
+    }
+}
+
+/// 加密 PDF 并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn encrypt_pdf(input: &str, password: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = crate::pdf_encrypt(&data, password)?;
+    match output {
+        Some(o) => {
+            write_bytes_create_new(&out_data, o)?;
+            Ok(o.to_string())
+        }
+        None => write_bytes_safe(&out_data, input, "pdf"),
+    }
+}
+
+/// 解密 PDF 并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn decrypt_pdf(input: &str, password: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = crate::pdf_decrypt(&data, password)?;
+    match output {
+        Some(o) => {
+            write_bytes_create_new(&out_data, o)?;
+            Ok(o.to_string())
+        }
+        None => write_bytes_safe(&out_data, input, "pdf"),
+    }
+}
+
 // ---- 通用 IO helpers(无 feature gate)----
 
 /// 原子写入(碰撞失败,不覆盖):`create_new` 保证检查与创建在同一系统调用,无 TOCTOU 竞态
@@ -180,8 +253,8 @@ fn write_bytes_safe(data: &[u8], input_path: &str, target_ext: &str) -> ToolResu
     ))
 }
 
-/// 确定解压输出目录:显式指定用之;否则源文件旁 `{stem}_extracted`,碰撞追加 `(n)`
-#[cfg(feature = "archive")]
+/// 确定解压/拆分输出目录:显式指定用之;否则源文件旁 `{stem}_extracted`,碰撞追加 `(n)`
+#[cfg(any(feature = "archive", feature = "pdf"))]
 fn resolve_extract_dir(input: &str, output_dir: Option<&str>) -> ToolResult<String> {
     match output_dir {
         Some(d) => {

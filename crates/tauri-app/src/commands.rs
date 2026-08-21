@@ -381,3 +381,35 @@ pub fn image_resize(
         output.as_deref(),
     )?)
 }
+
+/// 拆分 PDF:每页一个独立 PDF,返回产物路径列表
+#[tauri::command]
+pub fn pdf_split(path: String, output_dir: Option<String>) -> CmdResult<Vec<String>> {
+    Ok(nextool_fileconv::split_pdf(&path, output_dir.as_deref())?)
+}
+
+/// 旋转 PDF 所有页 90 度(顺时针);返回产物路径
+#[tauri::command]
+pub fn pdf_rotate(path: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_fileconv::rotate_pdf(&path, output.as_deref())?)
+}
+
+/// 加密 PDF(--password);返回产物路径
+#[tauri::command]
+pub fn pdf_encrypt(path: String, password: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_fileconv::encrypt_pdf(
+        &path,
+        &password,
+        output.as_deref(),
+    )?)
+}
+
+/// 解密 PDF(--password);返回产物路径
+#[tauri::command]
+pub fn pdf_decrypt(path: String, password: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_fileconv::decrypt_pdf(
+        &path,
+        &password,
+        output.as_deref(),
+    )?)
+}

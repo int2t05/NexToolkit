@@ -440,3 +440,125 @@ fn image_convert_invalid_input_fails() {
         .assert()
         .failure();
 }
+
+// ---- 文件转换:PDF(真实文件 IO,lopdf 造 fixture)----
+
+use lopdf::{dictionary, Document, Object};
+
+/// 用 lopdf 构造 N 页合法 PDF 写入临时目录
+fn write_sample_pdf(dir: &std::path::Path, name: &str, pages: u32) -> std::path::PathBuf {
+    let mut doc = Document::with_version("1.4");
+    let pages_id = doc.new_object_id();
+    let mut page_ids = Vec::new();
+    for _ in 0..pages {
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        });
+        page_ids.push(page_id);
+    }
+    let kids: Vec<Object> = page_ids.into_iter().map(Object::Reference).collect();
+    doc.objects.insert(
+        pages_id,
+        Object::Dictionary(dictionary! {
+            "Type" => "Pages",
+            "Kids" => kids,
+            "Count" => pages,
+        }),
+    );
+    let catalog_id = doc.add_object(dictionary! {
+        "Type" => "Catalog",
+        "Pages" => pages_id,
+    });
+    doc.trailer.set("Root", catalog_id);
+    let id: Vec<u8> = (0..16).collect();
+    doc.trailer.set(
+        "ID",
+        vec![
+            Object::String(id.clone(), lopdf::StringFormat::Hexadecimal),
+            Object::String(id, lopdf::StringFormat::Hexadecimal),
+        ],
+    );
+    let path = dir.join(name);
+    doc.save(&path).unwrap();
+    path
+}
+
+#[test]
+fn pdf_split_creates_per_page_files() {
+    let dir = tempdir().unwrap();
+    let pdf = write_sample_pdf(dir.path(), "doc.pdf", 3);
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "pdf", "split"])
+        .arg(&pdf)
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("已拆分为 3 个"));
+
+    // 产物落源文件旁 _extracted 目录,3 个单页 PDF
+    let split_dir = dir.path().join("doc_extracted");
+    let count = fs::read_dir(&split_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|x| x == "pdf"))
+        .count();
+    assert_eq!(count, 3, "应产出 3 个 PDF");
+}
+
+#[test]
+fn pdf_rotate_produces_output() {
+    let dir = tempdir().unwrap();
+    let pdf = write_sample_pdf(dir.path(), "r.pdf", 1);
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "pdf", "rotate"])
+        .arg(&pdf)
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("已旋转"));
+
+    // 产物落源文件旁(同格式碰撞 → _converted)
+    assert!(dir.path().join("r_converted.pdf").exists());
+}
+
+#[test]
+fn pdf_encrypt_marks_encrypted() {
+    let dir = tempdir().unwrap();
+    let pdf = write_sample_pdf(dir.path(), "e.pdf", 1);
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "pdf", "encrypt"])
+        .arg(&pdf)
+        .args(["--password", "secret"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("已加密"));
+
+    let enc = dir.path().join("e_converted.pdf");
+    assert!(enc.exists());
+    // 产物应声明加密(/Encrypt 在 trailer)
+    let meta = Document::load_metadata_mem(&fs::read(&enc).unwrap()).unwrap();
+    assert!(meta.encrypted, "加密产物应声明 /Encrypt");
+}
+
+#[test]
+fn pdf_encrypt_empty_password_fails() {
+    let dir = tempdir().unwrap();
+    let pdf = write_sample_pdf(dir.path(), "x.pdf", 1);
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "pdf", "encrypt"])
+        .arg(&pdf)
+        .args(["--password", ""])
+        .assert()
+        .failure();
+}

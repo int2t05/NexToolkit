@@ -4,7 +4,7 @@
 
 ## 功能
 
-38 个工具,8 组:编解码、格式转换、格式化、生成器、文本、加密、网络/时间、文件转换。CLI 与 GUI 共享同一核心库,行为一致。文件转换产物落源文件所在目录。
+42 个工具,8 组:编解码、格式转换、格式化、生成器、文本、加密、网络/时间、文件转换。CLI 与 GUI 共享同一核心库,行为一致。文件转换产物落源文件所在目录。
 
 ## 架构
 
@@ -72,6 +72,12 @@ nextool file-conv archive convert archive.zip tar       # 转 a.tar
 # 文件转换(图像)
 nextool file-conv image convert photo.png jpg           # 转 photo.jpg
 nextool file-conv image resize big.png --width 800 --height 0  # 等比缩放(高按宽比)
+
+# 文件转换(PDF)
+nextool file-conv pdf split doc.pdf                     # 每页一个 PDF
+nextool file-conv pdf rotate doc.pdf                    # 所有页顺时针 90°
+nextool file-conv pdf encrypt doc.pdf --password secret
+nextool file-conv pdf decrypt doc.pdf --password secret
 ```
 
 工具全集与参数详见 [docs/api.md](docs/api.md)。
@@ -91,7 +97,7 @@ core 单测 + CLI 集成测试,CI 三平台编译验证。
 
 ## 未来方向
 
-- **文件转换(对标 freeconvert)**:归档(zip/tar/gz)+ 图像(png/jpg/gif/bmp/webp/tiff/ico)已交付;PDF 纯 Rust 待做,音视频接 ffmpeg 子进程;产物落源目录。
+- **文件转换(对标 freeconvert)**:归档(zip/tar/gz)+ 图像(7 格式互转缩放)+ PDF(拆分/旋转/加解密)已交付;PDF 合并/压缩优化、音视频(ffmpeg 子进程)待做;产物落源目录。
 - **引擎层**:重格式转换按需接入,核心包不打包重引擎。
 - **智能层**:Smart Detection(剪贴板自动选工具)、Recipe 流水线(工具链式组合)。
 - **交互**:Ctrl+K 命令面板、收藏、输出语法高亮。

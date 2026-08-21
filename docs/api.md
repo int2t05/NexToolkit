@@ -115,8 +115,12 @@ const out = await invoke<string>('base64_encode', { input: 'Hello' })
 | `archive_convert` | `path: string`, `targetFormat: string`, `output?: string` | 产物路径 | `InvalidInput`/`Io` |
 | `image_convert` | `path: string`, `target: string`, `output?: string` | 产物路径 | `InvalidInput`(未知格式/解码失败)/`Other`(编码失败)/`Io` |
 | `image_resize` | `path: string`, `width: u32`, `height: u32`, `output?: string` | 产物路径 | `InvalidInput`(宽高同 0/解码失败)/`Io` |
+| `pdf_split` | `path: string`, `outputDir?: string` | 拆分件路径列表(`string[]`) | `InvalidInput`(格式)/`Io` |
+| `pdf_rotate` | `path: string`, `output?: string` | 产物路径 | `InvalidInput`(格式)/`Other`/`Io` |
+| `pdf_encrypt` | `path: string`, `password: string`, `output?: string` | 产物路径 | `InvalidInput`(空口令/格式)/`Other`/`Io` |
+| `pdf_decrypt` | `path: string`, `password: string`, `output?: string` | 产物路径 | `InvalidInput`(口令错/未加密/格式)/`Io` |
 
-产物默认落源文件所在目录:解压到 `{stem}_extracted/`,压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`(`create_new` 原子检查,不覆盖)。`output`/`outputDir` 省略时用默认。图像缩放 `width`/`height` 一维为 0 时按另一维等比;产物同源格式。
+产物默认落源文件所在目录:解压/拆分到 `{stem}_extracted/`,压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`(`create_new` 原子检查,不覆盖)。`output`/`outputDir` 省略时用默认。图像缩放 `width`/`height` 一维为 0 时按另一维等比;产物同源格式。PDF 旋转所有页顺时针 90°;加密用 AES(owner=user 同口令)。
 
 
 
