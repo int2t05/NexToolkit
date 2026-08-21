@@ -13,16 +13,16 @@
 - **双入口** — CLI(脚本/CI 友好,headless)+ GUI(可视化)共享同一核心库,行为一致。
 - **跨平台** — Windows / macOS / Linux。
 
-## 工具矩阵(v0.1,共 33 个)
+## 工具矩阵(共 32 个)
 
 | 分组 | 工具 |
 |---|---|
 | Encoders/Decoders | base64 · url · html · hex · jwt |
 | Converters | json-yaml · json-toml · json-csv · md-html · numbase |
 | Formatters | json-fmt · sql-fmt · xml-fmt · css-min |
-| Generators | hash · uuid · password · lorem · qr |
+| Generators | hash · hmac · uuid · password · lorem · qr |
 | Text | case · sort-dedup · reverse · regex · diff |
-| Crypto | aes-gcm · rsa · kdf · hmac |
+| Crypto | aes-gcm · rsa · kdf |
 | Net/Time | ipcalc · timestamp · cron · dns |
 
 ## 使用(CLI)
@@ -66,7 +66,7 @@ cargo clippy --workspace -- -D warnings
 
 ## 状态
 
-v0.1:CLI + GUI 双入口可用,33 工具,180 测试通过。重格式转换(音视频/Office/电子书)归后续引擎层。
+v0.2.0:CLI + GUI 双入口可用,32 工具,180 测试通过,三平台 Release 产物已发布。重格式转换(音视频/Office/电子书)归后续引擎层。
 
 ## 协议
 

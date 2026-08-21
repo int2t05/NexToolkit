@@ -141,6 +141,14 @@ export const TOOLS: Tool[] = [
     params: [{ key: 'bits', label: '位数', kind: 'number', default: '2048' }], needsMainInput: false,
   },
   {
+    id: 'rsa_encrypt', group: 'crypto', name: 'RSA 加密', desc: 'RSA-OAEP/SHA256',
+    params: [{ key: 'pubPem', label: '公钥 PEM', kind: 'textarea' }], needsMainInput: true,
+  },
+  {
+    id: 'rsa_decrypt', group: 'crypto', name: 'RSA 解密', desc: 'RSA-OAEP/SHA256',
+    params: [{ key: 'privPem', label: '私钥 PEM', kind: 'textarea' }], needsMainInput: true,
+  },
+  {
     id: 'pbkdf2', group: 'crypto', name: 'PBKDF2', desc: '密钥派生',
     params: [
       { key: 'salt', label: 'salt', kind: 'text' },

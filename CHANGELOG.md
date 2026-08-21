@@ -26,11 +26,9 @@
 
 ## [0.1.0] — 2026-08-21
 
-## [0.1.0] — 2026-08-21
-
 ### 新增
 
-- 核心库 `nextool-core`:33 工具,7 模块(encode/convert/format/generate/text/crypto/nettime),纯 Rust,无 UI 依赖。
+- 核心库 `nextool-core`:32 工具,7 模块(encode/convert/format/generate/text/crypto/nettime),纯 Rust,无 UI 依赖。
 - CLI `nextool`:7 一级子命令,参数/stdin 输入,错误非零退出码。
 - 180 单元+集成测试通过(真实数据,无 mock);clippy `-D warnings` 零警告。
 - 纯净审计通过(docs/audit/2026-08-21-core-tools.md)。

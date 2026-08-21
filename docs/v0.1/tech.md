@@ -11,7 +11,7 @@
 | 前端 | Svelte 5 + Vite + TypeScript | 前端基线 ~8KB(React 40KB、Vue 14KB),编译期消除运行时;Tauri 官方一等支持。UI 薄(表单+结果),生态够用。依据:Tauri 文档 frontend agnostic + 竞品 DevToys 用 Blazor 偏重(见 `reference/competitors/DevToys/`,shallow clone 183M)。 |
 | 后端语言 | Rust | 单二进制、无运行时依赖、跨平台一致、crypto/编码 crate 成熟。对比 DevToys(.NET 8 运行时)、CyberChef(Node >=24,见 `reference/competitors/CyberChef/package.json`)。 |
 | CLI | 独立 clap 二进制(非 tauri-plugin-cli) | 几 MB、headless 可用、进 CI/管道;与 GUI 共享 core。依据:Tauri 文档 `tauri-plugin-cli` 仍需 WebView2,与 CLI 脚本化冲突。 |
-| TLS | reqwest + rustls-tls | 纯 Rust TLS,避免 Linux OpenSSL 动态链接陷阱。依据:社区多篇生产指南一致(`UNVERIFIED:` 未在本机实测跨编译)。 |
+| TLS | 无(当前) | core 无网络请求工具,无 TLS 依赖。dns 经 hickory-resolver(内部纯 Rust)。未来若加 http 工具,用 reqwest + rustls-tls(纯 Rust TLS,避免 OpenSSL 动态链接)。 |
 | 错误 | thiserror(core) | 统一错误类型,Tauri 层 map 为前端可读。 |
 | Windows 链接器 | msvc target(`x86_64-pc-windows-msvc`) | 初期用 gnu target(本机有 mingw gcc,免装 VS)。core/CLI 在 gnu 下编译通过。但 GUI 集成阶段发现 gnu rustc 编译 `windows-sys 0.59`(Tauri 依赖链拉入完整 Win32 绑定)时 `STATUS_STACK_BUFFER_OVERRUN` ICE——gnu rustc 处理超大规模 FFI 绑定的栈溢出,debug 模式亦崩。故切换 MSVC target:装 VS BuildTools 2022(MSVC 14.51 + Windows 11 SDK 22621),装在 `D:\DevelopTools\VisualStudio`。MSVC 为 Tauri Windows 官方推荐路径。CI 三平台矩阵各平台用各自原生工具链。 |
 
@@ -53,17 +53,19 @@ NexToolkit/
 
 ## 3. 工具契约设计
 
-```rust
-//! nextool-core:工具统一契约
+core 按域分模块,每个工具为模块内自由函数,输入输出为普通 Rust 类型,错误统一为 `ToolError`。CLI 与 GUI 各自调用同一函数,行为一致。
 
-/// 工具输入输出明确,逻辑与 UI 解耦(CLI 与 GUI 共享)
-pub trait Tool {
-    fn name(&self) -> &str;
-    fn run(&self, input: &str, opts: &Options) -> Result<String, ToolError>;
-}
+```rust
+//! nextool-core:编解码模块示例
+
+/// Base64 标准编码
+pub fn base64_encode(input: &str) -> ToolResult<String> { ... }
+
+/// Base64 标准解码(容忍首尾空白)
+pub fn base64_decode(input: &str) -> ToolResult<String> { ... }
 ```
 
-依据:CyberChef `Operation` 的 `inputType`/`outputType`/`run`(`reference/competitors/CyberChef/src/core/operations/*.mjs`);DevToys 同工具双接口(`reference/competitors/DevToys/src/app/dev/DevToys.Api/`)。Rust trait 替代属性反射,编译期确定,无运行时开销。
+未采用统一 `Tool` trait:33 工具输入异构(文本/字节/双输入/多参数),强制 trait 不挣其复杂度,自由函数 + 统一错误类型更简洁(简洁优先)。设计时参考过 CyberChef `Operation` 的 `inputType`/`outputType`/`run`(`reference/competitors/CyberChef/src/core/operations/*.mjs`)与 DevToys 同工具双接口(`reference/competitors/DevToys/src/app/dev/DevToys.Api/`),但实现时简化。
 
 ## 4. 功能分类
 
@@ -84,23 +86,22 @@ pub trait Tool {
 | 第二类·免安装便携包 | 便携 GUI | 高 | Win: exe + `webviewInstallMode=skip`;macOS: `.app`;Linux: `AppImage` |
 | 第三类·安装版 | 系统安装器 | 中 | Win: `.msi`/`.nsis`;macOS: `.dmg`;Linux: `.deb` |
 
-- Windows 便携 `skip` 依据:Win11 默认预装 WebView2(本机实测 `Microsoft/EdgeWebView/Application/` 存在 151.0.4129.x);不嵌 runtime(嵌入增 100–200MB,违背轻量)。`UNVERIFIED:` `webviewInstallMode` 精确枚举值未在 context7 直接命中,实施前以 `tauri.conf.json` schema 与 `tauri-utils` 源码最终确认。
+- Windows 便携 `skip` 依据:Win11 默认预装 WebView2(本机实测 `Microsoft/EdgeWebView/Application/` 存在 151.0.4129.x);不嵌 runtime(嵌入增 100–200MB,违背轻量)。`tauri.conf.json` 已确认 `webviewInstallMode: {type: "skip"}`。
 - CI:`tauri-action` 三平台矩阵(跨平台编译无法单机交叉)。
 
 ## 6. 命令
 
 ```bash
-pnpm install                          # 前端依赖
+npm install                           # 前端依赖
 cargo fetch                           # Rust 依赖
-pnpm tauri dev                        # GUI 开发(热重载)
+npm run tauri dev                     # GUI 开发(热重载)
 cargo run -p nextool-cli -- <工具>    # CLI 开发
 cargo build -p nextool-cli --release  # CLI 单二进制
-pnpm tauri build                      # GUI 全形态
-pnpm tauri build --no-bundle          # GUI 便携原始 exe
-cargo test --workspace                # 全测试(真实数据)
-cargo clippy --workspace -- -D warnings
+npm run tauri build                   # GUI 全形态
+cargo test -p nextool-core -p nextool-cli  # 测试(真实数据)
+cargo clippy -p nextool-core -p nextool-cli -- -D warnings
 cargo fmt --check
-pnpm check                            # svelte-check
+npm run check                         # svelte-check
 ```
 
 ## 7. 代码风格
@@ -110,26 +111,17 @@ Rust,中文注释,文件头与关键函数注释。core 工具统一 trait:
 ```rust
 //! nextool-core 编解码模块:Base64/URL/Hex 等
 
-/// 工具统一契约:输入输出明确,逻辑与 UI 解耦
-pub trait Tool {
-    fn name(&self) -> &str;
-    fn run(&self, input: &str, opts: &Options) -> Result<String, ToolError>;
+/// Base64 标准编码
+pub fn base64_encode(input: &str) -> ToolResult<String> {
+    use base64::Engine;
+    Ok(base64::engine::general_purpose::STANDARD.encode(input.as_bytes()))
 }
 
-/// Base64 编解码
-pub struct Base64;
-
-impl Tool for Base64 {
-    fn name(&self) -> &str { "base64" }
-    fn run(&self, input: &str, opts: &Options) -> Result<String, ToolError> {
-        match opts.mode {
-            Mode::Encode => Ok(base64::engine::general_purpose::STANDARD.encode(input.as_bytes())),
-            Mode::Decode => {
-                let bytes = base64::engine::general_purpose::STANDARD.decode(input)?;
-                String::from_utf8(bytes).map_err(ToolError::from)
-            }
-        }
-    }
+/// Base64 标准解码(容忍首尾空白)
+pub fn base64_decode(input: &str) -> ToolResult<String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(input.trim())?;
+    String::from_utf8(bytes).map_err(ToolError::from)
 }
 ```
 
@@ -140,7 +132,7 @@ impl Tool for Base64 {
 准则:真实调用、真实数据,禁止 mock(CLAUDE.md)。优先用最高 seam(纯逻辑单测),全仓 seam 最少:
 
 - core 单测(`crates/core/src/*.rs` `#[cfg(test)]`):纯逻辑,无 Tauri/clap,主战场。
-- CLI 集成测试(`test/cli/`):`assert_cmd` 真起二进制。
+- CLI 集成测试(`crates/cli/tests/cli_smoke.rs`):`assert_cmd` 真起二进制。
 - Tauri command 层:薄,由 core 单测覆盖。
 - GUI E2E:v0.1 仅冒烟。
 
@@ -163,7 +155,7 @@ impl Tool for Base64 {
 | DevToys 源码 | `reference/competitors/DevToys/`(MIT,shallow 183M) | 分层/分类/同契约/避坑 |
 | DevToys 分组常量 | `reference/competitors/DevToys/src/app/dev/DevToys.Api/Tool/GUI/PredefinedCommonToolGroupNames.cs` | 七组分类依据 |
 | CyberChef 源码 | `reference/competitors/CyberChef/`(Apache-2.0,shallow 36M) | 操作模型/分类配置 |
-| CyberChef 操作 | `reference/competitors/CyberChef/src/core/operations/*.mjs`(505 个,已核实) | Tool trait 依据 |
+| CyberChef 操作 | `reference/competitors/CyberChef/src/core/operations/*.mjs`(505 个,已核实) | 工具契约设计参考(实际用自由函数) |
 | CyberChef 分类 | `reference/competitors/CyberChef/src/core/config/Categories.json`(已核实) | 配置驱动分类依据 |
 | Boop 源码 | `reference/competitors/Boop/`(MIT,shallow 10M) | 脚本模型/避坑 |
 | Boop 脚本管理 | `reference/competitors/Boop/Boop/Boop/System/ScriptManager.swift`(已核实) | 文本-only 模型依据 |
@@ -171,4 +163,4 @@ impl Tool for Base64 {
 | 生态调研报告 | `docs/research/2026-08-21-local-oss-toolbox.md` | freeconvert 对标/便携度三类/协议陷阱 |
 | Tauri 官方文档 | context7 `/tauri-apps/tauri-docs`;GitHub releases `tauri-v2.11.5`(2026-07-01) | 版本/bundle/CSP/CLI |
 
-`UNVERIFIED:` DevToys `IGuiTool`/`ICommandLineTool` 接口确切文件路径未逐一打开核实(仅确认 `PredefinedCommonToolGroupNames.cs`);各竞品实际产物体积未编译测量(仅 shallow clone 仓库体积);Tauri gnu-target GUI 链接兼容性未实测。
+`UNVERIFIED:` DevToys `IGuiTool`/`ICommandLineTool` 接口确切文件路径未逐一打开核实(仅确认 `PredefinedCommonToolGroupNames.cs`);各竞品实际产物体积未编译测量(仅 shallow clone 仓库体积)。Tauri GUI 三平台编译已由 CI 验证通过(MSVC target)。
