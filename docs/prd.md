@@ -4,13 +4,13 @@
 
 ## 定位
 
-市面无单一本地开源工具能同时覆盖"开发者编码工具 + 全格式转换":编码工具箱强编码弱媒体,格式引擎强媒体弱编码,在线服务以数据上云换一站式。NexToolkit 用 Tauri + Rust 自研填补此缺口,核心层纯 Rust 保证轻量,重格式转换归后续引擎层。
+市面无单一本地开源工具能同时覆盖"开发者编码工具 + 全格式转换":编码工具箱强编码弱媒体,格式引擎强媒体弱编码,在线服务以数据上云换一站式。NexToolkit 用 Tauri + Rust 自研填补此缺口,核心层纯 Rust 保证轻量,重格式转换归引擎层按需接入。
 
 ```mermaid
 flowchart LR
   F["freeconvert<br/>上云 · 广度 + 一站式"] -.->|"无编码 / 数据上云"| NT
   C["DevToys / CyberChef<br/>编码强 · 弱媒体"] --> NT
-  E["FFmpeg / Pandoc / Calibre<br/>媒体强 · 无编码"] -.->|"引擎层后续接入"| NT
+  E["FFmpeg / Pandoc / Calibre<br/>媒体强 · 无编码"] -.->|"引擎层按需接入"| NT
   NT["NexToolkit<br/>纯本地 · 编码 + 轻量格式 · 双入口"]
 ```
 
@@ -48,7 +48,5 @@ flowchart LR
 ## 非目标
 
 - 不做在线/云转换(纯本地是核心卖点)。
-- 不做重引擎格式转换(音视频/Office↔PDF/电子书)——归引擎层后续(见 [ROADMAP.md](ROADMAP.md))。
-- 不做 Smart Detection、Recipe 流水线——远期路线。
 - 不做移动端、账号/登录/遥测。
-- 不做单位/时区换算、字体转换(与定位无关)。
+- 重引擎格式转换(音视频/Office↔PDF/电子书)不打包进核心,归引擎层按需接入(见 [todo.md](todo.md) 未来方向)。

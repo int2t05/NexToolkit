@@ -1,0 +1,119 @@
+# 接口契约
+
+> Tauri command 契约:前端经 `@tauri-apps/api/core` 的 `invoke` 调用。无 HTTP API(桌面工具集)。
+> 命令在 `crates/tauri-app/src/commands.rs` 以 `#[tauri::command]` 声明,薄封装 `nextool-core`,共 49 个。
+> 前端参数以 camelCase 传入(Tauri 默认),Rust 侧 snake_case 接收。
+
+## 调用方式
+
+```ts
+import { invoke } from '@tauri-apps/api/core'
+const out = await invoke<string>('base64_encode', { input: 'Hello' })
+```
+
+## 约定
+
+- **成功**:返回字符串。
+- **失败**:reject 并返回 `CmdError`(序列化为字符串),前端 `catch` 展示。
+- **布尔参数**:前端传字符串 `"true"`/`"false"`(select 控件),Rust 侧 `parse_bool` 解析。
+- **枚举参数**:哈希算法 `"md5"|"sha1"|"sha256"|"sha512"`;大小写模式 `"upper"|"lower"|"title"|"snake"|"camel"|"kebab"`;DNS 类型 `"A"|"AAAA"|"MX"|"TXT"`。
+- **主输入**:文本类工具的主输入为 `input` 参数(GUI 主 textarea);生成类工具(`uuid_v4`/`uuid_v7`/`password_generate`/`lorem_ipsum`/`rsa_keygen`)无主输入。
+
+## 编解码
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `base64_encode` | `input: string` | base64 字符串 | — |
+| `base64_decode` | `input: string` | 解码字符串 | `Base64`/`Utf8` |
+| `url_encode` | `input: string` | percent-encoded | — |
+| `url_decode` | `input: string` | 解码字符串 | `Parse` |
+| `html_encode` | `input: string` | HTML 实体 | — |
+| `html_decode` | `input: string` | 解码字符串 | — |
+| `hex_encode` | `input: string` | 十六进制 | — |
+| `hex_decode` | `input: string` | 解码字符串 | `Parse`/`Utf8` |
+| `jwt_decode` | `input: string` | header/payload pretty JSON | `InvalidInput`/`Base64`/`Json` |
+
+## 转换
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `json_to_yaml` | `input: string` | YAML | `Json`/`Other` |
+| `yaml_to_json` | `input: string` | pretty JSON | `Other`/`Json` |
+| `json_to_toml` | `input: string` | TOML | `Json`/`InvalidInput`(null)/`Other` |
+| `toml_to_json` | `input: string` | pretty JSON | `Other`/`Json` |
+| `json_to_csv` | `input: string` | CSV | `Json`/`InvalidInput`(非数组/空/非对象)/`Other` |
+| `csv_to_json` | `input: string` | JSON 数组 | `Other`/`Json` |
+| `md_to_html` | `input: string` | HTML | — |
+| `numbase_convert` | `input: string`, `from: u32`, `to: u32` | 数字字符串 | `InvalidInput`(进制 ∉ 2..36 / 解析失败) |
+
+## 格式化
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `json_format` | `input: string` | 美化 JSON(2 空格) | `Json` |
+| `json_minify` | `input: string` | 压缩 JSON | `Json` |
+| `sql_format` | `input: string` | 关键字大写 SQL | `EmptyInput` |
+| `xml_format` | `input: string` | 美化 XML | `Other`(标签不匹配等) |
+| `xml_minify` | `input: string` | 压缩 XML | `Other` |
+| `css_minify` | `input: string` | 压缩 CSS | `Other` |
+
+## 生成器
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `uuid_v4` | — | UUID v4 | — |
+| `uuid_v7` | — | UUID v7 | — |
+| `hash` | `input: string`, `algo: string` | 十六进制摘要 | `InvalidInput`(未知算法) |
+| `hmac_compute` | `input: string`, `algo: string`, `key: string` | 十六进制 HMAC | `InvalidInput`(未知算法) |
+| `password_generate` | `length: usize`, `upper/lower/digits/symbols: string` | 密码 | `InvalidInput`(长度<1 / 字符集全 false) |
+| `lorem_ipsum` | `paragraphs: usize` | Lorem 文本 | `InvalidInput`(段数为 0) |
+| `qr_svg` | `input: string` | SVG 字符串 | `EmptyInput`/`Other`(数据过长) |
+
+## 文本
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `case_convert` | `input: string`, `mode: string` | 转换字符串 | `InvalidInput`(未知模式) |
+| `sort_lines` | `input: string` | 排序文本 | — |
+| `dedup_lines` | `input: string` | 去重保序 | — |
+| `reverse_text` | `input: string` | 反转文本 | — |
+| `regex_match` | `input: string`, `pattern: string` | 匹配行 | `Parse`(非法正则) |
+| `regex_replace` | `input: string`, `pattern: string`, `replacement: string` | 替换文本 | `Parse` |
+| `diff_text` | `input: string`, `other: string` | unified diff | — |
+
+## 加密
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `aes_gcm_encrypt` | `input: string`, `password: string` | base64 密文 | `Other` |
+| `aes_gcm_decrypt` | `input: string`, `password: string` | 明文 | `Base64`/`InvalidInput`(口令错或数据损坏) |
+| `rsa_keygen` | `bits: usize` | PEM 密钥对 | `InvalidInput`(<2048)/`Other` |
+| `rsa_encrypt` | `input: string`, `pub_pem: string` | base64 密文 | `InvalidInput`(无效 PEM)/`Other` |
+| `rsa_decrypt` | `input: string`, `priv_pem: string` | 明文 | `Base64`/`InvalidInput`/`Other` |
+| `pbkdf2` | `input: string`, `salt: string`, `iterations: u32` | 十六进制派生密钥(32B) | — |
+| `argon2` | `input: string`, `salt: string` | 十六进制哈希(32B) | `InvalidInput`(salt <8 字节)/`Other` |
+
+## 网络/时间
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `ipcalc` | `input: string` | 地址/网络/广播/掩码/主机范围/主机数 | `Parse`(非法 CIDR) |
+| `timestamp_to_human` | `input: string`, `tz: string` | RFC3339 可读时间 | `Parse`(非整数 / 无效时区 / 超范围) |
+| `timestamp_from_human` | `input: string`, `tz: string` | Unix 秒字符串 | `Parse`(时间格式 / 时区 / 夏令时歧义) |
+| `cron_next` | `input: string`, `count: usize` | 下次触发列表(每行一个 RFC3339) | `InvalidInput`(count=0)/`Parse`(非法 cron) |
+| `dns_lookup` | `input: string`, `rtype: string` | DNS 记录(每行一条) | `InvalidInput`(未知类型)/`Io`/`Other` |
+
+## 错误类型
+
+`CmdError(String)` 序列化为前端可读字符串,源自 `nextool_core::ToolError`:
+
+| 变体 | 触发 |
+|---|---|
+| `Utf8` | 字节→字符串失败(hex/base64 解码后非 UTF-8) |
+| `Base64` | base64 解码失败 |
+| `Json` | serde_json 错误 |
+| `Io` | IO/DNS resolver 错误 |
+| `EmptyInput` | 输入为空(sql/qr) |
+| `InvalidInput` | 参数非法(未知算法/模式/salt 过短/位数不足/非数组) |
+| `Parse` | 解析失败(YAML/TOML/CSV/正则/IP/时间/cron) |
+| `Other` | 其他(YAML/TOML 序列化、加解密失败、XML 解析等) |

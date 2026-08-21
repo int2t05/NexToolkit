@@ -34,7 +34,7 @@ NexToolkit/
 │   ├── cli/                  # clap 子命令,调 core;tests/cli_smoke.rs 集成测试
 │   └── tauri-app/            # Tauri command 薄封装 + tauri.conf.json + capabilities
 ├── src/                      # Svelte 5 前端
-├── docs/                     # pro / tech / todo / ROADMAP + audit
+├── docs/                     # prd / tech / todo / api / flow + audit
 ├── reference/                # 竞品源码(git 忽略,本地分析)
 └── .github/workflows/        # ci.yml + release.yml(三平台)
 ```

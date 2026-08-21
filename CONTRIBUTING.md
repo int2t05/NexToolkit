@@ -32,7 +32,7 @@ npm run check                   # 前端类型检查
 3. `crates/cli/src/<域>_cmd.rs` 加子命令;`main.rs` 注册。
 4. `crates/tauri-app/src/commands.rs` 加 `#[tauri::command]`;`lib.rs` 的 `use` 与 `generate_handler!` 注册。
 5. `src/tools.ts` 加工具元数据(分组/参数 schema)。
-6. 更新 `docs/pro.md` 工具矩阵。
+6. 更新 `docs/prd.md` 工具矩阵与 `docs/api.md` 命令契约。
 
 ## 提交
 
