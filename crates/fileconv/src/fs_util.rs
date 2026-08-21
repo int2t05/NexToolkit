@@ -1,17 +1,22 @@
-//! 文件 IO 边界:归档产物落盘与碰撞处理(依赖 std::fs,非纯内存)
+//! 文件 IO 边界:转换产物落盘与碰撞处理(依赖 std::fs,非纯内存)
 //!
-//! 纯内存转换在 [`crate::archive`];本模块组合纯逻辑 + 文件读写,供 CLI/GUI 共享,
-//! 避免边界逻辑重复。产物默认落源文件所在目录:解压到 `{stem}_extracted/`,
-//! 压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`,不静默覆盖。
+//! 组合各域纯内存转换 + 文件读写 + [`crate::path`] 路径计算,供 CLI/GUI 共享,避免边界逻辑重复。
+//! 产物默认落源文件所在目录:解压到 `{stem}_extracted/`,转换到 `{stem}.{ext}`,
+//! 碰撞追加 `_converted`→`(1)`→`(2)`,`create_new` 原子检查不静默覆盖。
 
-use crate::{ArchiveEntry, ArchiveFormat};
 use nextool_core::{ToolError, ToolResult};
 use std::io::Write;
 use std::path::Path;
 
+// ---- 归档 IO(archive feature)----
+
+#[cfg(feature = "archive")]
+use crate::archive::{ArchiveEntry, ArchiveFormat};
+
 /// 解压归档文件到目录(默认源文件旁 `_extracted`,碰撞追加 `(n)`)
 ///
 /// 返回 `(输出目录, 写出的文件路径列表)`。
+#[cfg(feature = "archive")]
 pub fn extract_to_dir(
     archive_path: &str,
     output_dir: Option<&str>,
@@ -30,6 +35,7 @@ pub fn extract_to_dir(
 }
 
 /// 压缩文件为归档并落盘(默认输出到第一个文件旁),返回产物路径
+#[cfg(feature = "archive")]
 pub fn compress_files(
     paths: &[String],
     format: ArchiveFormat,
@@ -57,6 +63,7 @@ pub fn compress_files(
 }
 
 /// 归档互转并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "archive")]
 pub fn convert_file(
     archive_path: &str,
     target: ArchiveFormat,
@@ -73,7 +80,7 @@ pub fn convert_file(
     }
 }
 
-/// 条目输出文件名:纯 gz 单文件(path 空)用源文件 stem,否则用条目路径
+#[cfg(feature = "archive")]
 fn entry_name(entry: &ArchiveEntry, archive_path: &str) -> String {
     if entry.path.is_empty() {
         Path::new(archive_path)
@@ -85,7 +92,7 @@ fn entry_name(entry: &ArchiveEntry, archive_path: &str) -> String {
     }
 }
 
-/// 归档格式扩展名
+#[cfg(feature = "archive")]
 fn archive_ext(fmt: ArchiveFormat) -> &'static str {
     match fmt {
         ArchiveFormat::Zip => "zip",
@@ -94,6 +101,53 @@ fn archive_ext(fmt: ArchiveFormat) -> &'static str {
         ArchiveFormat::Gz => "gz",
     }
 }
+
+// ---- 图像 IO(image feature)----
+
+#[cfg(feature = "image")]
+use crate::image::ImageFormat;
+
+/// 图像格式互转并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "image")]
+pub fn convert_image_file(
+    input: &str,
+    target: ImageFormat,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = crate::image_convert(&data, target)?;
+    match output {
+        Some(o) => {
+            write_bytes_create_new(&out_data, o)?;
+            Ok(o.to_string())
+        }
+        None => write_bytes_safe(&out_data, input, target.ext()),
+    }
+}
+
+/// 图像缩放并落盘(默认输出到源文件旁,同格式),返回产物路径
+///
+/// `width`/`height` 一维为 0 时按另一维等比缩放;目标格式与源相同。
+#[cfg(feature = "image")]
+pub fn resize_image_file(
+    input: &str,
+    width: u32,
+    height: u32,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = crate::detect_image_format(&data)?;
+    let out_data = crate::image_resize(&data, width, height, fmt)?;
+    match output {
+        Some(o) => {
+            write_bytes_create_new(&out_data, o)?;
+            Ok(o.to_string())
+        }
+        None => write_bytes_safe(&out_data, input, fmt.ext()),
+    }
+}
+
+// ---- 通用 IO helpers(无 feature gate)----
 
 /// 原子写入(碰撞失败,不覆盖):`create_new` 保证检查与创建在同一系统调用,无 TOCTOU 竞态
 ///
@@ -114,7 +168,7 @@ fn write_bytes_create_new(data: &[u8], path: &str) -> Result<(), std::io::Error>
 /// 迭代碰撞后缀写入直到成功,返回最终路径;超过 100 次报错
 fn write_bytes_safe(data: &[u8], input_path: &str, target_ext: &str) -> ToolResult<String> {
     for attempt in 0..100u32 {
-        let out = crate::compute_output_path(input_path, target_ext, attempt);
+        let out = crate::path::compute_output_path(input_path, target_ext, attempt);
         match write_bytes_create_new(data, &out) {
             Ok(()) => return Ok(out),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -127,6 +181,7 @@ fn write_bytes_safe(data: &[u8], input_path: &str, target_ext: &str) -> ToolResu
 }
 
 /// 确定解压输出目录:显式指定用之;否则源文件旁 `{stem}_extracted`,碰撞追加 `(n)`
+#[cfg(feature = "archive")]
 fn resolve_extract_dir(input: &str, output_dir: Option<&str>) -> ToolResult<String> {
     match output_dir {
         Some(d) => {
@@ -135,7 +190,7 @@ fn resolve_extract_dir(input: &str, output_dir: Option<&str>) -> ToolResult<Stri
         }
         None => {
             for attempt in 0..100u32 {
-                let dir = crate::compute_extract_dir(input, attempt);
+                let dir = crate::path::compute_extract_dir(input, attempt);
                 match std::fs::create_dir(&dir) {
                     Ok(()) => return Ok(dir),
                     Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,

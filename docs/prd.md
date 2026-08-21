@@ -16,7 +16,7 @@ flowchart LR
 
 **卖点:** 零上传(隐私)、无大小限制、无网络依赖、编码/加密能力。
 
-## 工具矩阵(共 36,纯 Rust)
+## 工具矩阵(共 38,纯 Rust)
 
 | 分组 | 工具 | 说明 |
 |---|---|---|
@@ -27,7 +27,7 @@ flowchart LR
 | Text | case · sort-dedup · reverse · regex · diff | case 含 snake/camel/kebab/title;diff 文本逐行 |
 | Crypto | aes-gcm · rsa · kdf | AES-GCM 加解密;RSA 密钥生成/加解密;kdf 含 PBKDF2/Argon2 |
 | Net/Time | ipcalc · timestamp · cron · dns | IP/子网计算;时间戳互转;cron 下次触发;DNS 查询 |
-| Files | archive extract · compress · convert · list | zip/tar/gz/tar.gz 解压压缩互转;字节域,产物落源目录 |
+| Files | archive extract · compress · convert · list · image convert · resize | zip/tar/gz/tar.gz 归档 + png/jpg/gif/bmp/webp/tiff/ico 图像互转与缩放;产物落源目录 |
 
 ## 验收
 

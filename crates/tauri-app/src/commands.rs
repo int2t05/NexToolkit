@@ -4,7 +4,7 @@
 
 use nextool_core::ToolError;
 use nextool_core::{CaseMode, HashAlgo, PasswordOpts};
-use nextool_fileconv::ArchiveFormat;
+use nextool_fileconv::{ArchiveFormat, ImageFormat};
 
 /// 命令错误:序列化为字符串供前端展示
 #[derive(Debug, serde::Serialize)]
@@ -53,6 +53,20 @@ fn parse_archive_format(s: &str) -> CmdResult<ArchiveFormat> {
         "targz" => ArchiveFormat::TarGz,
         "gz" => ArchiveFormat::Gz,
         _ => return Err(CmdError(format!("未知归档格式: {s}"))),
+    })
+}
+
+/// 解析图像格式字符串(前端 select 传入)
+fn parse_image_format(s: &str) -> CmdResult<ImageFormat> {
+    Ok(match s {
+        "png" => ImageFormat::Png,
+        "jpg" => ImageFormat::Jpeg,
+        "gif" => ImageFormat::Gif,
+        "bmp" => ImageFormat::Bmp,
+        "webp" => ImageFormat::Webp,
+        "tiff" => ImageFormat::Tiff,
+        "ico" => ImageFormat::Ico,
+        _ => return Err(CmdError(format!("未知图像格式: {s}"))),
     })
 }
 
@@ -335,6 +349,35 @@ pub fn archive_convert(
     Ok(nextool_fileconv::convert_file(
         &path,
         fmt,
+        output.as_deref(),
+    )?)
+}
+
+/// 图像格式转换(默认输出到源文件旁);返回产物路径
+#[tauri::command]
+pub fn image_convert(path: String, target: String, output: Option<String>) -> CmdResult<String> {
+    let fmt = parse_image_format(&target)?;
+    Ok(nextool_fileconv::convert_image_file(
+        &path,
+        fmt,
+        output.as_deref(),
+    )?)
+}
+
+/// 图像缩放(默认输出到源文件旁,同格式);返回产物路径
+///
+/// `width`/`height` 一维为 0 时按另一维等比缩放。
+#[tauri::command]
+pub fn image_resize(
+    path: String,
+    width: u32,
+    height: u32,
+    output: Option<String>,
+) -> CmdResult<String> {
+    Ok(nextool_fileconv::resize_image_file(
+        &path,
+        width,
+        height,
         output.as_deref(),
     )?)
 }

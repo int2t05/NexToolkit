@@ -1,4 +1,4 @@
-//! 文件转换子命令:归档解压/压缩/转换/列表
+//! 文件转换子命令:归档解压/压缩/转换/列表 + 图像转换/缩放
 //!
 //! 薄封装 [`nextool_fileconv`] 的纯内存 API 与 [`nextool_fileconv::fs_util`] 的落盘边界。
 //! 产物落源文件所在目录(碰撞处理见 fs_util)。
@@ -27,6 +27,32 @@ impl ArchiveFormatArg {
     }
 }
 
+/// 图像格式(clap 值枚举,与 [`nextool_fileconv::ImageFormat`] 对应)
+#[derive(Clone, Debug, ValueEnum)]
+pub enum ImageFormatArg {
+    Png,
+    Jpg,
+    Gif,
+    Bmp,
+    Webp,
+    Tiff,
+    Ico,
+}
+
+impl ImageFormatArg {
+    fn to_format(&self) -> nextool_fileconv::ImageFormat {
+        match self {
+            ImageFormatArg::Png => nextool_fileconv::ImageFormat::Png,
+            ImageFormatArg::Jpg => nextool_fileconv::ImageFormat::Jpeg,
+            ImageFormatArg::Gif => nextool_fileconv::ImageFormat::Gif,
+            ImageFormatArg::Bmp => nextool_fileconv::ImageFormat::Bmp,
+            ImageFormatArg::Webp => nextool_fileconv::ImageFormat::Webp,
+            ImageFormatArg::Tiff => nextool_fileconv::ImageFormat::Tiff,
+            ImageFormatArg::Ico => nextool_fileconv::ImageFormat::Ico,
+        }
+    }
+}
+
 #[derive(Args)]
 pub struct FileConvArgs {
     #[command(subcommand)]
@@ -39,6 +65,32 @@ enum FileConvCmd {
     Archive {
         #[command(subcommand)]
         cmd: ArchiveCmd,
+    },
+    /// 图像操作:格式转换/缩放
+    Image {
+        #[command(subcommand)]
+        cmd: ImageCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum ImageCmd {
+    /// 图像格式转换
+    Convert {
+        input: String,
+        target: ImageFormatArg,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 图像缩放(--width/--height 一维为 0 时按另一维等比)
+    Resize {
+        input: String,
+        #[arg(long)]
+        width: u32,
+        #[arg(long)]
+        height: u32,
+        #[arg(long)]
+        output: Option<String>,
     },
 }
 
@@ -108,6 +160,34 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 )
                 .map_err(|e| e.to_string())?;
                 println!("已转换 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Image { cmd } => match cmd {
+            ImageCmd::Convert {
+                input,
+                target,
+                output,
+            } => {
+                let out = nextool_fileconv::convert_image_file(
+                    &input,
+                    target.to_format(),
+                    output.as_deref(),
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            ImageCmd::Resize {
+                input,
+                width,
+                height,
+                output,
+            } => {
+                let out =
+                    nextool_fileconv::resize_image_file(&input, width, height, output.as_deref())
+                        .map_err(|e| e.to_string())?;
+                println!("已缩放 {out}");
                 Ok(())
             }
         },

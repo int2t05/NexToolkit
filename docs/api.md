@@ -105,7 +105,7 @@ const out = await invoke<string>('base64_encode', { input: 'Hello' })
 
 ## 文件转换
 
-字节域命令(command 接收文件路径,后端 `std::fs` 读写,返回路径或路径列表)。归档格式枚举:`"zip"|"tar"|"targz"|"gz"`。
+字节域命令(command 接收文件路径,后端 `std::fs` 读写,返回路径或路径列表)。归档格式枚举:`"zip"|"tar"|"targz"|"gz"`;图像格式:`"png"|"jpg"|"gif"|"bmp"|"webp"|"tiff"|"ico"`。
 
 | 命令 | 参数 | 返回 | 错误 |
 |---|---|---|---|
@@ -113,8 +113,10 @@ const out = await invoke<string>('base64_encode', { input: 'Hello' })
 | `archive_extract` | `path: string`, `outputDir?: string` | 写出文件路径列表(`string[]`) | `Io`/`InvalidInput`(路径遍历/格式) |
 | `archive_compress` | `paths: string[]`, `format: string`, `output?: string` | 产物路径 | `InvalidInput`(未知格式/GZ 多文件)/`Io` |
 | `archive_convert` | `path: string`, `targetFormat: string`, `output?: string` | 产物路径 | `InvalidInput`/`Io` |
+| `image_convert` | `path: string`, `target: string`, `output?: string` | 产物路径 | `InvalidInput`(未知格式/解码失败)/`Other`(编码失败)/`Io` |
+| `image_resize` | `path: string`, `width: u32`, `height: u32`, `output?: string` | 产物路径 | `InvalidInput`(宽高同 0/解码失败)/`Io` |
 
-产物默认落源文件所在目录:解压到 `{stem}_extracted/`,压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`(`create_new` 原子检查,不覆盖)。`output`/`outputDir` 省略时用默认。
+产物默认落源文件所在目录:解压到 `{stem}_extracted/`,压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`(`create_new` 原子检查,不覆盖)。`output`/`outputDir` 省略时用默认。图像缩放 `width`/`height` 一维为 0 时按另一维等比;产物同源格式。
 
 
 

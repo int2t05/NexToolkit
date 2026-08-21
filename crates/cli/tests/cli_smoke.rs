@@ -331,3 +331,112 @@ fn archive_extract_collision_appends_suffix() {
     assert!(second.exists(), "碰撞应追加 (1) 后缀");
     let _ = a1;
 }
+
+// ---- 文件转换:图像(真实文件 IO,临时目录,程序化造 PNG)----
+
+use image::GenericImageView;
+
+/// 造一个 4x3 红色 PNG 写入临时目录,返回路径
+fn write_sample_png(dir: &std::path::Path, name: &str) -> std::path::PathBuf {
+    let img =
+        image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(4, 3, image::Rgb([255, 0, 0])));
+    let path = dir.join(name);
+    img.save(&path).unwrap();
+    path
+}
+
+#[test]
+fn image_convert_png_to_jpeg() {
+    let dir = tempdir().unwrap();
+    let png = write_sample_png(dir.path(), "src.png");
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "image", "convert"])
+        .arg(&png)
+        .arg("jpg")
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("已转换"));
+
+    let jpeg = dir.path().join("src.jpg");
+    assert!(jpeg.exists(), "产物应落源文件所在目录");
+
+    // 验证产物确为 JPEG(魔术字节 FF D8 FF)
+    let bytes = fs::read(&jpeg).unwrap();
+    assert_eq!(&bytes[..3], &[0xFF, 0xD8, 0xFF]);
+}
+
+#[test]
+fn image_convert_png_to_webp() {
+    let dir = tempdir().unwrap();
+    let png = write_sample_png(dir.path(), "img.png");
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "image", "convert"])
+        .arg(&png)
+        .arg("webp")
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    assert!(dir.path().join("img.webp").exists());
+}
+
+#[test]
+fn image_resize_smaller() {
+    let dir = tempdir().unwrap();
+    let png = write_sample_png(dir.path(), "big.png");
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "image", "resize"])
+        .arg(&png)
+        .args(["--width", "2", "--height", "2"])
+        .current_dir(dir.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("已缩放"));
+
+    // 产物落源目录,同格式 PNG 但与源同名碰撞 → big_converted.png,尺寸 2x2
+    let out = dir.path().join("big_converted.png");
+    let resized = image::open(&out).unwrap();
+    assert_eq!(resized.dimensions(), (2, 2));
+}
+
+#[test]
+fn image_resize_keep_aspect() {
+    let dir = tempdir().unwrap();
+    // 4x3 → width=8,height=0 应等比到 8x6
+    let png = write_sample_png(dir.path(), "orig.png");
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "image", "resize"])
+        .arg(&png)
+        .args(["--width", "8", "--height", "0"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let out = dir.path().join("orig_converted.png");
+    let resized = image::open(&out).unwrap();
+    assert_eq!(resized.dimensions(), (8, 6));
+}
+
+#[test]
+fn image_convert_invalid_input_fails() {
+    let dir = tempdir().unwrap();
+    let bad = dir.path().join("not.png");
+    fs::write(&bad, b"not an image").unwrap();
+
+    Command::cargo_bin("nextool")
+        .unwrap()
+        .args(["file-conv", "image", "convert"])
+        .arg(&bad)
+        .arg("jpg")
+        .assert()
+        .failure();
+}
