@@ -113,7 +113,9 @@ fn aes_gcm_roundtrip() {
         .args(["crypto", "aes-encrypt", "--password", "pw", "Secret"])
         .assert()
         .success();
-    let ciphertext = std::str::from_utf8(&enc.get_output().stdout).unwrap().trim();
+    let ciphertext = std::str::from_utf8(&enc.get_output().stdout)
+        .unwrap()
+        .trim();
 
     Command::cargo_bin("nextool")
         .unwrap()
@@ -131,7 +133,9 @@ fn aes_gcm_wrong_password_fails() {
         .args(["crypto", "aes-encrypt", "--password", "pw", "Secret"])
         .assert()
         .success();
-    let ciphertext = std::str::from_utf8(&enc.get_output().stdout).unwrap().trim();
+    let ciphertext = std::str::from_utf8(&enc.get_output().stdout)
+        .unwrap()
+        .trim();
 
     Command::cargo_bin("nextool")
         .unwrap()
@@ -145,14 +149,26 @@ fn timestamp_roundtrip() {
     // ts -> human -> ts 应一致(Asia/Shanghai +08)
     Command::cargo_bin("nextool")
         .unwrap()
-        .args(["net-time", "ts-to-human", "1700000000", "--tz", "Asia/Shanghai"])
+        .args([
+            "net-time",
+            "ts-to-human",
+            "1700000000",
+            "--tz",
+            "Asia/Shanghai",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("2023-11-15T06:13:20+08:00"));
 
     Command::cargo_bin("nextool")
         .unwrap()
-        .args(["net-time", "ts-from-human", "2023-11-15 06:13:20", "--tz", "Asia/Shanghai"])
+        .args([
+            "net-time",
+            "ts-from-human",
+            "2023-11-15 06:13:20",
+            "--tz",
+            "Asia/Shanghai",
+        ])
         .assert()
         .success()
         .stdout("1700000000\n");

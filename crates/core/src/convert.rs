@@ -37,7 +37,9 @@ pub fn json_to_csv(s: &str) -> ToolResult<String> {
         _ => return Err(ToolError::InvalidInput("JSON 必须为数组".into())),
     };
     if arr.is_empty() {
-        return Err(ToolError::InvalidInput("JSON 数组为空,无法确定 CSV 表头".into()));
+        return Err(ToolError::InvalidInput(
+            "JSON 数组为空,无法确定 CSV 表头".into(),
+        ));
     }
     let headers: Vec<String> = match &arr[0] {
         serde_json::Value::Object(obj) => obj.keys().cloned().collect(),

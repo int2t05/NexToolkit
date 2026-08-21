@@ -60,7 +60,7 @@ pub fn hmac_compute(data: &str, key: &str, algo: HashAlgo) -> ToolResult<String>
                 .map_err(|e| ToolError::Other(e.to_string()))?;
             mac.update(data.as_bytes());
             Ok(format!("{:x}", mac.finalize().into_bytes()))
-        },
+        }
         HashAlgo::Sha256 => {
             let mut mac = Hmac::<Sha256>::new_from_slice(key.as_bytes())
                 .map_err(|e| ToolError::Other(e.to_string()))?;
@@ -124,7 +124,9 @@ pub fn password_generate(length: usize, opts: &PasswordOpts) -> ToolResult<Strin
     }
 
     if charset.is_empty() {
-        return Err(ToolError::InvalidInput("至少需要选择一种字符集".to_string()));
+        return Err(ToolError::InvalidInput(
+            "至少需要选择一种字符集".to_string(),
+        ));
     }
 
     let chars: Vec<char> = charset.chars().collect();
@@ -165,8 +167,7 @@ pub fn qr_svg(s: &str) -> ToolResult<String> {
     if s.is_empty() {
         return Err(ToolError::EmptyInput);
     }
-    let code = qrcode::QrCode::new(s.as_bytes())
-        .map_err(|e| ToolError::Other(e.to_string()))?;
+    let code = qrcode::QrCode::new(s.as_bytes()).map_err(|e| ToolError::Other(e.to_string()))?;
     Ok(code.render::<qrcode::render::svg::Color>().build())
 }
 
@@ -204,7 +205,10 @@ mod tests {
     #[test]
     fn hash_sha1_abc() {
         // NIST FIPS 180-1 测试向量
-        assert_eq!(hash("abc", HashAlgo::Sha1).unwrap(), "a9993e364706816aba3e25717850c26c9cd0d89d");
+        assert_eq!(
+            hash("abc", HashAlgo::Sha1).unwrap(),
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
+        );
     }
 
     // ---- hmac ----
@@ -212,8 +216,12 @@ mod tests {
     #[test]
     fn hmac_sha256_known_value() {
         // 测试向量来自 hmac crate 官方文档
-        let result =
-            hmac_compute("input message", "my secret and secure key", HashAlgo::Sha256).unwrap();
+        let result = hmac_compute(
+            "input message",
+            "my secret and secure key",
+            HashAlgo::Sha256,
+        )
+        .unwrap();
         assert_eq!(
             result,
             "97d2a569059bbcd8ead4444ff99071f4c01d005bcefe0d3567e1be628e5fdcd9"

@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build and publish'
+        required: true
+        type: string
+
+jobs:
+  # CLI 单二进制:三平台构建上传
+  cli-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            artifact: nextool-cli-linux-x64
+            ext: ''
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: nextool-cli-windows-x64
+            ext: '.exe'
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            artifact: nextool-cli-macos-x64
+            ext: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Build CLI release
+        run: cargo build -p nextool-cli --release --target ${{ matrix.target }}
+      - name: Rename artifact
+        shell: bash
+        run: |
+          mv target/${{ matrix.target }}/release/nextool${{ matrix.ext }} nextool-${{ github.ref_name }}-${{ matrix.artifact }}${{ matrix.ext }}
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: nextool-${{ github.ref_name }}-${{ matrix.artifact }}${{ matrix.ext }}
+
+  # Tauri GUI:三平台构建上传安装包与便携包
+  gui-release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - name: Install frontend deps
+        run: npm ci
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/tauri-app
+      - name: Install Linux deps
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: crates/tauri-app
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseDraft: true
+          prerelease: false

@@ -22,7 +22,8 @@ pub fn url_encode(input: &str) -> ToolResult<String> {
 
 /// URL 百分号解码:将 %XX 还原为原始字符,解码结果非合法 UTF-8 时报错
 pub fn url_decode(input: &str) -> ToolResult<String> {
-    let cow = urlencoding::decode(input).map_err(|_| ToolError::Parse("URL 解码结果非合法 UTF-8".to_string()))?;
+    let cow = urlencoding::decode(input)
+        .map_err(|_| ToolError::Parse("URL 解码结果非合法 UTF-8".to_string()))?;
     Ok(cow.into_owned())
 }
 

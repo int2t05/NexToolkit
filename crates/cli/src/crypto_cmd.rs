@@ -13,9 +13,17 @@ pub struct CryptoArgs {
 #[derive(Subcommand)]
 enum CryptoCmd {
     /// AES-256-GCM 加密:--password 指定口令
-    AesEncrypt { #[arg(long)] password: String, input: Option<String> },
+    AesEncrypt {
+        #[arg(long)]
+        password: String,
+        input: Option<String>,
+    },
     /// AES-256-GCM 解密:--password 指定口令
-    AesDecrypt { #[arg(long)] password: String, input: Option<String> },
+    AesDecrypt {
+        #[arg(long)]
+        password: String,
+        input: Option<String>,
+    },
     /// 生成 RSA 密钥对(PEM):位数(2048/4096)
     RsaKeygen { bits: usize },
     /// RSA 加密:--pub-pem 公钥 PEM 文件路径或内联
@@ -39,7 +47,11 @@ enum CryptoCmd {
         input: Option<String>,
     },
     /// Argon2id 派生:--salt
-    Argon2 { #[arg(long)] salt: String, input: Option<String> },
+    Argon2 {
+        #[arg(long)]
+        salt: String,
+        input: Option<String>,
+    },
 }
 
 /// 读取 PEM:若以 `-----BEGIN` 开头视为内联 PEM,否则当作文件路径读取
@@ -55,26 +67,45 @@ pub fn run(args: CryptoArgs) -> Result<(), String> {
     match args.cmd {
         CryptoCmd::AesEncrypt { password, input } => {
             let input = read_input(input)?;
-            println!("{}", nextool_core::aes_gcm_encrypt(&input, &password).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::aes_gcm_encrypt(&input, &password).map_err(|e| e.to_string())?
+            );
         }
         CryptoCmd::AesDecrypt { password, input } => {
             let input = read_input(input)?;
-            println!("{}", nextool_core::aes_gcm_decrypt(&input, &password).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::aes_gcm_decrypt(&input, &password).map_err(|e| e.to_string())?
+            );
         }
         CryptoCmd::RsaKeygen { bits } => {
-            println!("{}", nextool_core::rsa_keygen(bits).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::rsa_keygen(bits).map_err(|e| e.to_string())?
+            );
         }
         CryptoCmd::RsaEncrypt { pub_pem, input } => {
             let pem = load_pem(&pub_pem)?;
             let input = read_input(input)?;
-            println!("{}", nextool_core::rsa_encrypt(&input, &pem).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::rsa_encrypt(&input, &pem).map_err(|e| e.to_string())?
+            );
         }
         CryptoCmd::RsaDecrypt { priv_pem, input } => {
             let pem = load_pem(&priv_pem)?;
             let input = read_input(input)?;
-            println!("{}", nextool_core::rsa_decrypt(&input, &pem).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::rsa_decrypt(&input, &pem).map_err(|e| e.to_string())?
+            );
         }
-        CryptoCmd::Pbkdf2 { salt, iterations, input } => {
+        CryptoCmd::Pbkdf2 {
+            salt,
+            iterations,
+            input,
+        } => {
             let input = read_input(input)?;
             println!(
                 "{}",
@@ -83,7 +114,10 @@ pub fn run(args: CryptoArgs) -> Result<(), String> {
         }
         CryptoCmd::Argon2 { salt, input } => {
             let input = read_input(input)?;
-            println!("{}", nextool_core::kdf_argon2(&input, &salt).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::kdf_argon2(&input, &salt).map_err(|e| e.to_string())?
+            );
         }
     }
     Ok(())

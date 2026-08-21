@@ -66,7 +66,10 @@ pub fn run(args: EncodeArgs) -> Result<(), String> {
         }
         EncodeCmd::Jwt { input } => {
             let input = read_input(input)?;
-            println!("{}", nextool_core::jwt_decode(&input).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::jwt_decode(&input).map_err(|e| e.to_string())?
+            );
         }
     }
     Ok(())

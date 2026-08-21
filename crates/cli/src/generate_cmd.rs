@@ -14,7 +14,10 @@ pub struct GenerateArgs {
 #[derive(Subcommand)]
 enum GenerateCmd {
     /// 计算哈希:md5/sha1/sha256/sha512
-    Hash { algo: HashAlgoArg, input: Option<String> },
+    Hash {
+        algo: HashAlgoArg,
+        input: Option<String>,
+    },
     /// 生成 HMAC:--key 指定密钥
     Hmac {
         algo: HashAlgoArg,
@@ -68,7 +71,10 @@ pub fn run(args: GenerateArgs) -> Result<(), String> {
     match args.cmd {
         GenerateCmd::Hash { algo, input } => {
             let input = read_input(input)?;
-            println!("{}", nextool_core::hash(&input, algo.into()).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::hash(&input, algo.into()).map_err(|e| e.to_string())?
+            );
         }
         GenerateCmd::Hmac { algo, key, input } => {
             let input = read_input(input)?;
@@ -83,7 +89,13 @@ pub fn run(args: GenerateArgs) -> Result<(), String> {
         GenerateCmd::UuidV7 => {
             println!("{}", nextool_core::uuid_v7().map_err(|e| e.to_string())?);
         }
-        GenerateCmd::Password { length, upper, lower, digits, symbols } => {
+        GenerateCmd::Password {
+            length,
+            upper,
+            lower,
+            digits,
+            symbols,
+        } => {
             // 未指定任何字符集时默认全开
             let opts = nextool_core::PasswordOpts {
                 upper: upper || (!upper && !lower && !digits && !symbols),
@@ -97,11 +109,17 @@ pub fn run(args: GenerateArgs) -> Result<(), String> {
             );
         }
         GenerateCmd::Lorem { paragraphs } => {
-            println!("{}", nextool_core::lorem_ipsum(paragraphs).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::lorem_ipsum(paragraphs).map_err(|e| e.to_string())?
+            );
         }
         GenerateCmd::Qr { input } => {
             let input = read_input_optional(input)?.ok_or("二维码需要输入文本")?;
-            println!("{}", nextool_core::qr_svg(&input).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::qr_svg(&input).map_err(|e| e.to_string())?
+            );
         }
     }
     Ok(())

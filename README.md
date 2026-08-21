@@ -23,23 +23,36 @@
 | Generators | hash · uuid · password · lorem · qr |
 | Text | case · sort-dedup · reverse · regex · diff |
 | Crypto | aes-gcm · rsa · kdf · hmac |
-| Net/Time | ipcalc · timestamp · cron · http · dns |
+| Net/Time | ipcalc · timestamp · cron · dns |
 
-## 使用
+## 使用(CLI)
 
 ```bash
-nextool base64 encode "Hello"          # SGVsbG8=
-echo -n "Man" | nextool base64 encode  # TWFu(stdin)
-nextool base64 decode "SGVsbG8="       # Hello
+nextool encode base64 encode "Hello"          # SGVsbG8=
+echo -n "Man" | nextool encode base64 encode  # TWFu(stdin)
+nextool encode base64 decode "SGVsbG8="       # Hello
+nextool generate hash sha256 abc
+nextool crypto aes-encrypt --password pw "Secret"
 nextool --help
+```
+
+## 使用(GUI)
+
+下载 Release 的安装包/便携包,或本地启动:
+
+```bash
+npm install
+npm run tauri dev    # 开发模式(热重载)
+npm run tauri build  # 生产构建(产出安装包与便携包)
 ```
 
 ## 构建
 
 ```bash
-cargo build -p nextool-cli --release   # CLI 单二进制
-pnpm install && pnpm tauri build       # GUI(后续版本)
-cargo test --workspace                 # 测试(真实数据)
+cargo build -p nextool-cli --release   # CLI 单二进制(~4.5MB)
+npm install && npm run tauri build     # GUI(需 Rust + Node)
+cargo test --workspace                 # 测试(真实数据,无 mock)
+cargo clippy --workspace -- -D warnings
 ```
 
 ## 文档
@@ -48,10 +61,12 @@ cargo test --workspace                 # 测试(真实数据)
 - [docs/v0.1/PRD.md](docs/v0.1/PRD.md) — v0.1 版本需求
 - [docs/v0.1/tech.md](docs/v0.1/tech.md) — 技术选型与设计依据
 - [docs/research/](docs/research/) — 竞品调研与对标
+- [docs/audit/](docs/audit/) — 纯净审计报告
+- [CHANGELOG.md](CHANGELOG.md) — 更新日志
 
 ## 状态
 
-v0.1 开发中。CLI 核心闭环已验证,工具矩阵逐步集成。
+v0.1:CLI + GUI 双入口可用,33 工具,180 测试通过。重格式转换(音视频/Office/电子书)归后续引擎层。
 
 ## 协议
 
