@@ -13,7 +13,7 @@
 | CLI | 独立 clap 二进制(非 tauri-plugin-cli) | 几 MB、headless 可用、进 CI/管道;与 GUI 共享 core。依据:Tauri 文档 `tauri-plugin-cli` 仍需 WebView2,与 CLI 脚本化冲突。 |
 | TLS | reqwest + rustls-tls | 纯 Rust TLS,避免 Linux OpenSSL 动态链接陷阱。依据:社区多篇生产指南一致(`UNVERIFIED:` 未在本机实测跨编译)。 |
 | 错误 | thiserror(core) | 统一错误类型,Tauri 层 map 为前端可读。 |
-| Windows 链接器 | gnu target(`x86_64-pc-windows-gnu`) | 本机无 MSVC(无 cl.exe / VS Build Tools),有 mingw gcc 16.1 ucrt。用 gnu target 复用现有 gcc 作链接器,避免装多 GB VS Build Tools。`UNVERIFIED:` Tauri GUI(webview2-com FFI)在 gnu target 的链接兼容性未实测;CLI 必然可用,GUI 受阻则降级。 |
+| Windows 链接器 | gnu target(`x86_64-pc-windows-gnu`) | 本机无 MSVC(无 cl.exe / VS Build Tools),有 mingw gcc 16.1 ucrt。用 gnu target 复用现有 gcc 作链接器,避免装多 GB VS Build Tools。CLI + core 已实测可用(`cargo build` / 180 测试通过)。Tauri GUI(webview2-com FFI)在 gnu target 的链接兼容性待 GUI 集成阶段验证,受阻则文档化降级。 |
 
 ## 2. Cargo Workspace 架构
 

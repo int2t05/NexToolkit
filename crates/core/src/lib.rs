@@ -1,12 +1,24 @@
 //! nextool-core:NexToolkit 核心逻辑库
 //!
 //! 纯 Rust 实现,不依赖 Tauri/clap/stdin/stdout,可被 CLI 与 GUI 共享调用。
-//! 工具按域分模块(encode/convert/format/generate/text/crypto/nettime),
-//! 每个模块暴露类型化函数,输入输出为普通 Rust 类型,错误统一为 [`ToolError`]。
+//! 工具按域分模块,每个模块暴露类型化函数,输入输出为普通 Rust 类型,错误统一为 [`ToolError`]。
+//! 各模块只写自己文件,不修改本文件;lib.rs 通过 glob 重导出全部公开函数。
 
+pub mod convert;
+pub mod crypto;
 pub mod encode;
+pub mod format;
+pub mod generate;
+pub mod nettime;
+pub mod text;
 
-pub use encode::{base64_decode, base64_encode};
+pub use convert::*;
+pub use crypto::*;
+pub use encode::*;
+pub use format::*;
+pub use generate::*;
+pub use nettime::*;
+pub use text::*;
 
 /// 核心错误类型:统一错误来源,供 CLI/GUI 转换为用户可读信息
 #[derive(Debug, thiserror::Error)]
@@ -20,8 +32,17 @@ pub enum ToolError {
     #[error("JSON 错误: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("IO 错误: {0}")]
+    Io(#[from] std::io::Error),
+
     #[error("输入为空")]
     EmptyInput,
+
+    #[error("无效输入: {0}")]
+    InvalidInput(String),
+
+    #[error("解析失败: {0}")]
+    Parse(String),
 
     #[error("{0}")]
     Other(String),
