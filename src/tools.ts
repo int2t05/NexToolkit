@@ -212,4 +212,21 @@ export const TOOLS: Tool[] = [
     ],
     needsMainInput: false,
   },
+  {
+    id: 'image_convert', group: 'fileconv', name: '图像转换', desc: '图像格式互转(png/jpg/gif/bmp/webp/tiff/ico)',
+    params: [
+      { key: 'path', label: '图像文件', kind: 'file' },
+      { key: 'target', label: '目标格式', kind: 'select', options: ['png', 'jpg', 'gif', 'bmp', 'webp', 'tiff', 'ico'], default: 'png' },
+    ],
+    needsMainInput: false,
+  },
+  {
+    id: 'image_resize', group: 'fileconv', name: '图像缩放', desc: '缩放(一维 0 等比)',
+    params: [
+      { key: 'path', label: '图像文件', kind: 'file' },
+      { key: 'width', label: '宽', kind: 'number', default: '0' },
+      { key: 'height', label: '高', kind: 'number', default: '0' },
+    ],
+    needsMainInput: false,
+  },
 ];

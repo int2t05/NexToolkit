@@ -46,10 +46,12 @@ NexToolkit/
 
 ## 双域架构
 
-core 为文本域(`&str→String`,47 函数),fileconv 为字节域(`&[u8]→Vec<u8>`)。归档是二进制数据,强制 String 会引入 base64 开销与 UTF-8 错误风险,故字节域独立 crate。fileconv 复用 core 的 `ToolError`(单一错误定义,无新变体),分两层:
+core 为文本域(`&str→String`,47 函数),fileconv 为字节域(`&[u8]→Vec<u8>`)。归档/图像是二进制数据,强制 String 会引入 base64 开销与 UTF-8 错误风险,故字节域独立 crate。fileconv 复用 core 的 `ToolError`(单一错误定义,无新变体),分模块:
 
-- `archive` 模块:纯内存逻辑(解压/压缩/互转/检测/路径计算),可独立单测。
-- `fs_util` 模块:IO 边界,组合纯逻辑 + `std::fs` 落盘(产物落源目录 + 碰撞处理),供 CLI/GUI 共享,避免边界逻辑重复。
+- `archive` 模块:归档纯内存逻辑(解压/压缩/互转/检测/路径安全),feature gate。
+- `image` 模块:图像纯内存逻辑(格式互转/缩放/检测),feature gate;仅启用常用栅格格式(png/jpeg/gif/bmp/webp/tiff/ico)控制体积。
+- `path` 模块:纯字符串路径计算(产物路径 + 碰撞后缀),无 feature gate,各域复用。
+- `fs_util` 模块:IO 边界,组合各域纯逻辑 + `std::fs` 落盘(产物落源目录 + `create_new` 碰撞处理),供 CLI/GUI 共享,避免边界逻辑重复。
 
 ## 模块设计
 
