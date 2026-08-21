@@ -1,7 +1,7 @@
 // 工具元数据:声明式 schema 驱动 UI 渲染与 invoke 调用
 // 新增工具只需在此追加一项,无需改 UI 组件
 
-export type ParamKind = 'text' | 'textarea' | 'select' | 'number' | 'password';
+export type ParamKind = 'text' | 'textarea' | 'select' | 'number' | 'password' | 'file';
 
 export interface ToolParam {
   key: string;
@@ -10,6 +10,7 @@ export interface ToolParam {
   options?: string[]; // select 选项
   default?: string;
   placeholder?: string;
+  multiple?: boolean; // file 专用:多选
 }
 
 export interface Tool {
@@ -22,7 +23,7 @@ export interface Tool {
 }
 
 export type Group =
-  | 'encode' | 'convert' | 'format' | 'generate' | 'text' | 'crypto' | 'nettime';
+  | 'encode' | 'convert' | 'format' | 'generate' | 'text' | 'crypto' | 'nettime' | 'fileconv';
 
 export const GROUP_LABEL: Record<Group, { zh: string; en: string }> = {
   encode: { zh: '编解码', en: 'Encoders' },
@@ -32,6 +33,7 @@ export const GROUP_LABEL: Record<Group, { zh: string; en: string }> = {
   text: { zh: '文本', en: 'Text' },
   crypto: { zh: '加密', en: 'Crypto' },
   nettime: { zh: '网络/时间', en: 'Net/Time' },
+  fileconv: { zh: '文件转换', en: 'Files' },
 };
 
 // 工具清单:与 CLI 子命令一一对应,invoke 命令名为蛇形
@@ -178,5 +180,36 @@ export const TOOLS: Tool[] = [
     id: 'dns_lookup', group: 'nettime', name: 'DNS 查询', desc: 'A/AAAA/MX/TXT',
     params: [{ key: 'rtype', label: '类型', kind: 'select', options: ['A', 'AAAA', 'MX', 'TXT'], default: 'A' }],
     needsMainInput: true,
+  },
+
+  // ---- fileconv ----
+  {
+    id: 'archive_list', group: 'fileconv', name: '归档列表', desc: '列出归档内文件(zip/tar/gz)',
+    params: [{ key: 'path', label: '归档文件', kind: 'file' }],
+    needsMainInput: false,
+  },
+  {
+    id: 'archive_extract', group: 'fileconv', name: '解压归档', desc: '解压到源文件旁目录',
+    params: [
+      { key: 'path', label: '归档文件', kind: 'file' },
+      { key: 'outputDir', label: '输出目录', kind: 'text', placeholder: '默认源文件旁' },
+    ],
+    needsMainInput: false,
+  },
+  {
+    id: 'archive_compress', group: 'fileconv', name: '压缩文件', desc: '创建归档(zip/tar/gz)',
+    params: [
+      { key: 'paths', label: '文件', kind: 'file', multiple: true },
+      { key: 'format', label: '格式', kind: 'select', options: ['zip', 'tar', 'targz', 'gz'], default: 'zip' },
+    ],
+    needsMainInput: false,
+  },
+  {
+    id: 'archive_convert', group: 'fileconv', name: '归档转换', desc: '归档格式互转',
+    params: [
+      { key: 'path', label: '归档文件', kind: 'file' },
+      { key: 'targetFormat', label: '目标格式', kind: 'select', options: ['zip', 'tar', 'targz', 'gz'], default: 'zip' },
+    ],
+    needsMainInput: false,
   },
 ];

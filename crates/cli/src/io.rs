@@ -33,3 +33,8 @@ pub fn read_input_optional(input: Option<String>) -> Result<Option<String>, Stri
         }
     }
 }
+
+/// 读取二进制输入:按文件路径读取全部字节(供归档列表等纯内存查看场景)
+pub fn read_bytes_input(path: &str) -> Result<Vec<u8>, String> {
+    std::fs::read(path).map_err(|e| format!("读取文件失败 {path}: {e}"))
+}

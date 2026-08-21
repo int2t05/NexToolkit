@@ -1,0 +1,20 @@
+[package]
+name = "nextool-fileconv"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "NexToolkit 文件转换:字节域(归档/图像/PDF),纯内存逻辑"
+
+[dependencies]
+nextool-core = { path = "../core" }
+
+# archive(feature-gated)
+zip = { version = "2", optional = true }
+tar = { version = "0.4", optional = true }
+flate2 = { version = "1", optional = true }
+
+[features]
+default = ["archive"]
+archive = ["dep:zip", "dep:tar", "dep:flate2"]

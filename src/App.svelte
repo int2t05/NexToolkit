@@ -1,18 +1,20 @@
 <script lang="ts">
   import { TOOLS, GROUP_LABEL, type Group, type Tool } from './tools';
   import { invoke } from './bindings';
+  import { open as openDialog } from '@tauri-apps/plugin-dialog';
 
   let lang: 'zh' | 'en' = $state('zh');
   let query = $state('');
   let selectedTool = $state<Tool>(TOOLS[0]);
   let mainInput = $state('');
   let params = $state<Record<string, string>>({});
+  let files = $state<Record<string, string[]>>({});
   let output = $state('');
   let error = $state('');
   let loading = $state(false);
   let copied = $state(false);
 
-  const groups: Group[] = ['encode', 'convert', 'format', 'generate', 'text', 'crypto', 'nettime'];
+  const groups: Group[] = ['encode', 'convert', 'format', 'generate', 'text', 'crypto', 'nettime', 'fileconv'];
 
   // 按搜索词过滤工具
   const filteredTools = $derived.by(() => {
@@ -29,8 +31,21 @@
       defaults[p.key] = p.default ?? '';
     }
     params = defaults;
+    files = {};
     output = '';
     error = '';
+  }
+
+  // 文件参数:调系统对话框选择,单选存单元素数组,多选存数组
+  async function pickFile(key: string, multiple: boolean) {
+    const sel = await openDialog({ multiple });
+    files = { ...files, [key]: sel ? (Array.isArray(sel) ? sel : [sel]) : [] };
+  }
+
+  // 文件名展示(去目录,只留文件名,多个逗号分隔)
+  function fileDisplay(key: string): string {
+    const list = files[key] ?? [];
+    return list.map((p) => p.split(/[\\/]/).pop() ?? p).join(', ');
   }
 
   async function run() {
@@ -40,13 +55,20 @@
     try {
       const args: Record<string, unknown> = {};
       for (const p of selectedTool.params) {
-        args[p.key] = p.kind === 'number' ? Number(params[p.key] ?? 0) : params[p.key] ?? '';
+        if (p.kind === 'file') {
+          args[p.key] = p.multiple ? files[p.key] ?? [] : (files[p.key]?.[0] ?? '');
+        } else if (p.kind === 'number') {
+          args[p.key] = Number(params[p.key] ?? 0);
+        } else {
+          args[p.key] = params[p.key] ?? '';
+        }
       }
       // diff 工具的"对比文本"参数用 other;主输入作 input
       if (selectedTool.needsMainInput) {
         args['input'] = mainInput;
       }
-      output = await invoke(selectedTool.id, args);
+      const result = await invoke<unknown>(selectedTool.id, args);
+      output = Array.isArray(result) ? result.join('\n') : String(result);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -115,6 +137,13 @@
                   <option value={opt}>{opt}</option>
                 {/each}
               </select>
+            {:else if p.kind === 'file'}
+              <button class="file-pick" onclick={() => pickFile(p.key, p.multiple ?? false)}>
+                {t('选择文件', 'Choose file')}{p.multiple ? ` (${t('多选', 'multi')})` : ''}
+              </button>
+              {#if fileDisplay(p.key)}
+                <span class="file-name">{fileDisplay(p.key)}</span>
+              {/if}
             {:else if p.kind === 'password'}
               <input type="password" bind:value={params[p.key]} placeholder={p.placeholder ?? ''} />
             {:else if p.kind === 'number'}
@@ -181,6 +210,8 @@
   .params { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 12px; }
   .param { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #8b8f99; }
   .param input, .param select, .param textarea { background: #0f1115; border: 1px solid #2a2d35; color: #e4e6eb; padding: 6px 8px; border-radius: 6px; font-size: 13px; }
+  .file-pick { background: #23262e; border: 1px solid #2a2d35; color: #e4e6eb; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .file-name { color: #7ce0a6; font-size: 12px; word-break: break-all; }
   .main-input { width: 100%; background: #0f1115; border: 1px solid #2a2d35; color: #e4e6eb; padding: 10px; border-radius: 6px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 13px; resize: vertical; }
   .actions { display: flex; gap: 8px; margin: 12px 0; }
   .run { background: #2563eb; color: #fff; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }

@@ -26,10 +26,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Format check
         run: cargo fmt --check --all
-      - name: Clippy (core + cli; gui 在 tauri-build 验证,因 generate_context! 需前端 dist)
-        run: cargo clippy -p nextool-core -p nextool-cli --all-targets -- -D warnings
+      - name: Clippy (core + cli + fileconv; gui 在 tauri-build 验证,因 generate_context! 需前端 dist)
+        run: cargo clippy -p nextool-core -p nextool-cli -p nextool-fileconv --all-targets -- -D warnings
       - name: Test (real data, no mock)
-        run: cargo test -p nextool-core -p nextool-cli
+        run: cargo test -p nextool-core -p nextool-cli -p nextool-fileconv
 
   # 前端:类型检查 + 构建(验证 Svelte 代码)
   frontend:

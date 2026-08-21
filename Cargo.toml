@@ -1,6 +1,6 @@
 # NexToolkit 工作空间:core(纯逻辑)+ cli(clap)+ tauri-app(GUI)
 [workspace]
-members = ["crates/core", "crates/cli", "crates/tauri-app"]
+members = ["crates/core", "crates/cli", "crates/tauri-app", "crates/fileconv"]
 resolver = "2"
 
 [workspace.package]

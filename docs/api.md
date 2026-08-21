@@ -103,7 +103,20 @@ const out = await invoke<string>('base64_encode', { input: 'Hello' })
 | `cron_next` | `input: string`, `count: usize` | 下次触发列表(每行一个 RFC3339) | `InvalidInput`(count=0)/`Parse`(非法 cron) |
 | `dns_lookup` | `input: string`, `rtype: string` | DNS 记录(每行一条) | `InvalidInput`(未知类型)/`Io`/`Other` |
 
-## 错误类型
+## 文件转换
+
+字节域命令(command 接收文件路径,后端 `std::fs` 读写,返回路径或路径列表)。归档格式枚举:`"zip"|"tar"|"targz"|"gz"`。
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `archive_list` | `path: string` | 文件列表(每行 `路径\t大小`) | `Io`/`InvalidInput`(格式不识别) |
+| `archive_extract` | `path: string`, `outputDir?: string` | 写出文件路径列表(`string[]`) | `Io`/`InvalidInput`(路径遍历/格式) |
+| `archive_compress` | `paths: string[]`, `format: string`, `output?: string` | 产物路径 | `InvalidInput`(未知格式/GZ 多文件)/`Io` |
+| `archive_convert` | `path: string`, `targetFormat: string`, `output?: string` | 产物路径 | `InvalidInput`/`Io` |
+
+产物默认落源文件所在目录:解压到 `{stem}_extracted/`,压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`(`create_new` 原子检查,不覆盖)。`output`/`outputDir` 省略时用默认。
+
+
 
 `CmdError(String)` 序列化为前端可读字符串,源自 `nextool_core::ToolError`:
 
