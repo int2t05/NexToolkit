@@ -10,9 +10,9 @@ use commands::{
     cron_next, css_minify, csv_to_json, dedup_lines, diff_text, dns_lookup, hash, hex_decode,
     hex_encode, hmac_compute, html_decode, html_encode, ipcalc, json_format, json_minify,
     json_to_csv, json_to_toml, json_to_yaml, jwt_decode, lorem_ipsum, md_to_html, numbase_convert,
-    password_generate, pbkdf2, qr_svg, regex_match, regex_replace, reverse_text, rsa_keygen,
-    sort_lines, sql_format, timestamp_from_human, timestamp_to_human, toml_to_json, url_decode,
-    url_encode, uuid_v4, uuid_v7, xml_format, xml_minify, yaml_to_json,
+    password_generate, pbkdf2, qr_svg, regex_match, regex_replace, reverse_text, rsa_decrypt,
+    rsa_encrypt, rsa_keygen, sort_lines, sql_format, timestamp_from_human, timestamp_to_human,
+    toml_to_json, url_decode, url_encode, uuid_v4, uuid_v7, xml_format, xml_minify, yaml_to_json,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -59,6 +59,8 @@ pub fn run() {
             aes_gcm_encrypt,
             aes_gcm_decrypt,
             rsa_keygen,
+            rsa_encrypt,
+            rsa_decrypt,
             pbkdf2,
             argon2,
             ipcalc,

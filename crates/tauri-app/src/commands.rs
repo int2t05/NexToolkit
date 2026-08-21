@@ -238,6 +238,14 @@ pub fn rsa_keygen(bits: usize) -> CmdResult<String> {
     Ok(nextool_core::rsa_keygen(bits)?)
 }
 #[tauri::command]
+pub fn rsa_encrypt(input: String, pub_pem: String) -> CmdResult<String> {
+    Ok(nextool_core::rsa_encrypt(&input, &pub_pem)?)
+}
+#[tauri::command]
+pub fn rsa_decrypt(input: String, priv_pem: String) -> CmdResult<String> {
+    Ok(nextool_core::rsa_decrypt(&input, &priv_pem)?)
+}
+#[tauri::command]
 pub fn pbkdf2(input: String, salt: String, iterations: u32) -> CmdResult<String> {
     Ok(nextool_core::kdf_pbkdf2(&input, &salt, iterations)?)
 }
