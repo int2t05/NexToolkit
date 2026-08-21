@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 核心库与 CLI:测试 + lint(真实数据,无 mock)
+  core-cli:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+      - uses: Swatinem/rust-cache@v2
+      - name: Format check
+        run: cargo fmt --check --all
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test (real data, no mock)
+        run: cargo test --workspace
+
+  # 前端:类型检查 + 构建(验证 Svelte 代码)
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - name: Install
+        run: npm ci
+      - name: Type check
+        run: npm run check
+      - name: Build
+        run: npm run build
+
+  # Tauri GUI 构建:三平台验证编译(本地内存受限无法编译,CI 为唯一验证环境)
+  tauri-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - name: Install frontend deps
+        run: npm ci
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/tauri-app
+      - name: Install Linux deps
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: crates/tauri-app

@@ -1,0 +1,18 @@
+/* 全局基础样式:暗色主题,系统字体,滚动条 */
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2d35;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
