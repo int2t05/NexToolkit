@@ -52,7 +52,9 @@ pub fn aes_gcm_decrypt(b64: &str, password: &str) -> ToolResult<String> {
 
     let blob = base64::engine::general_purpose::STANDARD.decode(b64.trim())?;
     if blob.len() < 16 + 12 {
-        return Err(ToolError::InvalidInput("解密失败:口令错误或数据损坏".into()));
+        return Err(ToolError::InvalidInput(
+            "解密失败:口令错误或数据损坏".into(),
+        ));
     }
     let (salt, rest) = blob.split_at(16);
     let (nonce, ciphertext) = rest.split_at(12);
@@ -82,8 +84,8 @@ pub fn rsa_keygen(bits: usize) -> ToolResult<String> {
     }
 
     let mut rng = OsRng;
-    let priv_key = RsaPrivateKey::new(&mut rng, bits)
-        .map_err(|e| ToolError::Other(e.to_string()))?;
+    let priv_key =
+        RsaPrivateKey::new(&mut rng, bits).map_err(|e| ToolError::Other(e.to_string()))?;
     let pub_key = RsaPublicKey::from(&priv_key);
 
     let priv_pem = priv_key
@@ -93,7 +95,11 @@ pub fn rsa_keygen(bits: usize) -> ToolResult<String> {
         .to_pkcs1_pem(LineEnding::LF)
         .map_err(|e| ToolError::Other(e.to_string()))?;
 
-    Ok(format!("{}\n\n{}\n", priv_pem.trim_end(), pub_pem.trim_end()))
+    Ok(format!(
+        "{}\n\n{}\n",
+        priv_pem.trim_end(),
+        pub_pem.trim_end()
+    ))
 }
 
 /// 解析 RSA 公钥 PEM,兼容 PKCS#8/SPKI(`-----BEGIN PUBLIC KEY-----`)
@@ -176,7 +182,13 @@ mod tests {
 
     #[test]
     fn aes_gcm_roundtrip() {
-        for s in ["", "a", "Hello, NexToolkit!", "中文测试🎉", "多行\n文本\t含特殊字符"] {
+        for s in [
+            "",
+            "a",
+            "Hello, NexToolkit!",
+            "中文测试🎉",
+            "多行\n文本\t含特殊字符",
+        ] {
             let enc = aes_gcm_encrypt(s, "p@ssw0rd").unwrap();
             let dec = aes_gcm_decrypt(&enc, "p@ssw0rd").unwrap();
             assert_eq!(dec, s, "roundtrip 失败:明文 {s:?}");
@@ -315,7 +327,7 @@ mod tests {
     fn argon2_short_salt_rejected() {
         assert!(kdf_argon2("password", "short").is_err()); // 5 字节
         assert!(kdf_argon2("password", "").is_err()); // 0 字节
-        // 恰好 8 字节应通过
+                                                      // 恰好 8 字节应通过
         assert!(kdf_argon2("password", "12345678").is_ok());
     }
 

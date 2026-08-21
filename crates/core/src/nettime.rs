@@ -21,9 +21,7 @@ pub fn ipcalc(input: &str) -> ToolResult<String> {
 
     let host_bits = net.max_prefix_len() - net.prefix_len();
     // 可用主机数按位运算计算,避免遍历大子网
-    let total = 1u128
-        .checked_shl(host_bits as u32)
-        .unwrap_or(u128::MAX);
+    let total = 1u128.checked_shl(host_bits as u32).unwrap_or(u128::MAX);
     // IPv4 前缀 <31 时排除网络地址与广播地址;IPv6 及 /31、/32 全部可用
     let usable = match &net {
         IpNet::V4(v4) if v4.prefix_len() < 31 => total.saturating_sub(2),

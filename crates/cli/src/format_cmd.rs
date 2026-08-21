@@ -29,22 +29,40 @@ enum FormatCmd {
 pub fn run(args: FormatArgs) -> Result<(), String> {
     match args.cmd {
         FormatCmd::JsonFmt { input } => {
-            println!("{}", nextool_core::json_format(&read_input(input)?).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::json_format(&read_input(input)?).map_err(|e| e.to_string())?
+            );
         }
         FormatCmd::JsonMin { input } => {
-            println!("{}", nextool_core::json_minify(&read_input(input)?).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::json_minify(&read_input(input)?).map_err(|e| e.to_string())?
+            );
         }
         FormatCmd::SqlFmt { input } => {
-            println!("{}", nextool_core::sql_format(&read_input(input)?).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::sql_format(&read_input(input)?).map_err(|e| e.to_string())?
+            );
         }
         FormatCmd::XmlFmt { input } => {
-            println!("{}", nextool_core::xml_format(&read_input(input)?).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::xml_format(&read_input(input)?).map_err(|e| e.to_string())?
+            );
         }
         FormatCmd::XmlMin { input } => {
-            println!("{}", nextool_core::xml_minify(&read_input(input)?).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::xml_minify(&read_input(input)?).map_err(|e| e.to_string())?
+            );
         }
         FormatCmd::CssMin { input } => {
-            println!("{}", nextool_core::css_minify(&read_input(input)?).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::css_minify(&read_input(input)?).map_err(|e| e.to_string())?
+            );
         }
     }
     Ok(())

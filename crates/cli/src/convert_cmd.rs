@@ -13,11 +13,20 @@ pub struct ConvertArgs {
 #[derive(Subcommand)]
 enum ConvertCmd {
     /// JSON 与 YAML 互转
-    JsonYaml { mode: ConvertMode, input: Option<String> },
+    JsonYaml {
+        mode: ConvertMode,
+        input: Option<String>,
+    },
     /// JSON 与 TOML 互转
-    JsonToml { mode: ConvertMode, input: Option<String> },
+    JsonToml {
+        mode: ConvertMode,
+        input: Option<String>,
+    },
     /// JSON 与 CSV 互转
-    JsonCsv { mode: ConvertMode, input: Option<String> },
+    JsonCsv {
+        mode: ConvertMode,
+        input: Option<String>,
+    },
     /// Markdown 转 HTML
     MdHtml { input: Option<String> },
     /// 进制转换:--from 与 --to 指定进制(2..=36)
@@ -64,7 +73,10 @@ pub fn run(args: ConvertArgs) -> Result<(), String> {
         }
         ConvertCmd::MdHtml { input } => {
             let input = read_input(input)?;
-            println!("{}", nextool_core::md_to_html(&input).map_err(|e| e.to_string())?);
+            println!(
+                "{}",
+                nextool_core::md_to_html(&input).map_err(|e| e.to_string())?
+            );
         }
         ConvertCmd::Numbase { from, to, input } => {
             let input = read_input(input)?;

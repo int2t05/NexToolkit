@@ -77,34 +77,28 @@ pub fn case_convert(s: &str, mode: CaseMode) -> ToolResult<String> {
             }
             out
         }
-        CaseMode::Snake => {
-            split_words(s)
-                .iter()
-                .map(|w| w.to_lowercase())
-                .collect::<Vec<_>>()
-                .join("_")
-        }
-        CaseMode::Camel => {
-            split_words(s)
-                .iter()
-                .enumerate()
-                .map(|(i, w)| {
-                    if i == 0 {
-                        w.to_lowercase()
-                    } else {
-                        capitalize(w)
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join("")
-        }
-        CaseMode::Kebab => {
-            split_words(s)
-                .iter()
-                .map(|w| w.to_lowercase())
-                .collect::<Vec<_>>()
-                .join("-")
-        }
+        CaseMode::Snake => split_words(s)
+            .iter()
+            .map(|w| w.to_lowercase())
+            .collect::<Vec<_>>()
+            .join("_"),
+        CaseMode::Camel => split_words(s)
+            .iter()
+            .enumerate()
+            .map(|(i, w)| {
+                if i == 0 {
+                    w.to_lowercase()
+                } else {
+                    capitalize(w)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(""),
+        CaseMode::Kebab => split_words(s)
+            .iter()
+            .map(|w| w.to_lowercase())
+            .collect::<Vec<_>>()
+            .join("-"),
     };
     Ok(result)
 }
@@ -147,7 +141,10 @@ pub fn reverse_text(s: &str) -> ToolResult<String> {
 /// 正则匹配:每个匹配各占一行,无匹配返回空串,非法正则返回 Err
 pub fn regex_match(pattern: &str, input: &str) -> ToolResult<String> {
     let re = regex::Regex::new(pattern).map_err(|e| ToolError::Parse(e.to_string()))?;
-    let matches: Vec<String> = re.find_iter(input).map(|m| m.as_str().to_string()).collect();
+    let matches: Vec<String> = re
+        .find_iter(input)
+        .map(|m| m.as_str().to_string())
+        .collect();
     Ok(matches.join("\n"))
 }
 
@@ -173,29 +170,62 @@ mod tests {
     fn case_convert_upper_lower_title() {
         assert_eq!(case_convert("hello", CaseMode::Upper).unwrap(), "HELLO");
         assert_eq!(case_convert("HELLO", CaseMode::Lower).unwrap(), "hello");
-        assert_eq!(case_convert("hello world", CaseMode::Title).unwrap(), "Hello World");
-        assert_eq!(case_convert("HELLO WORLD", CaseMode::Title).unwrap(), "Hello World");
+        assert_eq!(
+            case_convert("hello world", CaseMode::Title).unwrap(),
+            "Hello World"
+        );
+        assert_eq!(
+            case_convert("HELLO WORLD", CaseMode::Title).unwrap(),
+            "Hello World"
+        );
     }
 
     #[test]
     fn case_convert_snake() {
-        assert_eq!(case_convert("hello world", CaseMode::Snake).unwrap(), "hello_world");
-        assert_eq!(case_convert("HelloWorld", CaseMode::Snake).unwrap(), "hello_world");
-        assert_eq!(case_convert("hello-world", CaseMode::Snake).unwrap(), "hello_world");
+        assert_eq!(
+            case_convert("hello world", CaseMode::Snake).unwrap(),
+            "hello_world"
+        );
+        assert_eq!(
+            case_convert("HelloWorld", CaseMode::Snake).unwrap(),
+            "hello_world"
+        );
+        assert_eq!(
+            case_convert("hello-world", CaseMode::Snake).unwrap(),
+            "hello_world"
+        );
     }
 
     #[test]
     fn case_convert_camel() {
-        assert_eq!(case_convert("hello_world", CaseMode::Camel).unwrap(), "helloWorld");
-        assert_eq!(case_convert("hello world", CaseMode::Camel).unwrap(), "helloWorld");
-        assert_eq!(case_convert("hello-world", CaseMode::Camel).unwrap(), "helloWorld");
+        assert_eq!(
+            case_convert("hello_world", CaseMode::Camel).unwrap(),
+            "helloWorld"
+        );
+        assert_eq!(
+            case_convert("hello world", CaseMode::Camel).unwrap(),
+            "helloWorld"
+        );
+        assert_eq!(
+            case_convert("hello-world", CaseMode::Camel).unwrap(),
+            "helloWorld"
+        );
     }
 
     #[test]
     fn case_convert_kebab() {
-        assert_eq!(case_convert("HelloWorld", CaseMode::Kebab).unwrap(), "hello-world");
-        assert_eq!(case_convert("hello_world", CaseMode::Kebab).unwrap(), "hello-world");
-        assert_eq!(case_convert("hello-world", CaseMode::Kebab).unwrap(), "hello-world");
+        assert_eq!(
+            case_convert("HelloWorld", CaseMode::Kebab).unwrap(),
+            "hello-world"
+        );
+        assert_eq!(
+            case_convert("hello_world", CaseMode::Kebab).unwrap(),
+            "hello-world"
+        );
+        assert_eq!(
+            case_convert("hello-world", CaseMode::Kebab).unwrap(),
+            "hello-world"
+        );
     }
 
     // ---- sort_lines ----
@@ -293,7 +323,10 @@ mod tests {
 
     #[test]
     fn regex_replace_group() {
-        assert_eq!(regex_replace(r"(\w+)@(\w+)", "$2@$1", "user@host").unwrap(), "host@user");
+        assert_eq!(
+            regex_replace(r"(\w+)@(\w+)", "$2@$1", "user@host").unwrap(),
+            "host@user"
+        );
     }
 
     #[test]
