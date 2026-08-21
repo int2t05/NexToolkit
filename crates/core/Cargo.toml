@@ -1,0 +1,14 @@
+[package]
+name = "nextool-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "NexToolkit 核心逻辑库:纯 Rust,无 UI 依赖"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }

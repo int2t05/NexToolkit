@@ -1,0 +1,26 @@
+# Rust 构建产物
+target/
+**/*.rs.bk
+
+# 前端依赖与构建
+node_modules/
+dist/
+.vite/
+
+# Tauri 构建产物
+crates/tauri-app/gen/
+crates/tauri-app/WixTools/
+
+# 调研参考仓库(本地分析用,不入库)
+reference/
+.tmp-research/
+
+# 环境与编辑器
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

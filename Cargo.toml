@@ -1,0 +1,27 @@
+# NexToolkit 工作空间:core(纯逻辑)+ cli(clap)+ tauri-app(GUI)
+[workspace]
+members = ["crates/core", "crates/cli", "crates/tauri-app"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["int2t05"]
+repository = "https://github.com/int2t05/NexToolkit"
+rust-version = "1.80"
+
+# 共享依赖版本,子 crate 用 dep = { workspace = true }
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+base64 = "0.22"
+
+# 发布体积优化(对标"小体积"目标)
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

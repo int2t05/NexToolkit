@@ -1,0 +1,12 @@
+[package]
+name = "nextool-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "NexToolkit 桌面 GUI(Tauri)"
+
+# Tauri GUI 集成在后续步骤填充;此处先占位保证 workspace 成员完整
+[dependencies]
+nextool-core = { path = "../core" }
