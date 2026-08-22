@@ -35,26 +35,65 @@ pub fn extract_to_dir(
     Ok((out_dir, written))
 }
 
-/// 压缩文件为归档并落盘(默认输出到第一个文件旁),返回产物路径
+/// 压缩文件/目录为归档并落盘(默认输出到第一个路径旁),返回产物路径
+///
+/// 文件直接读;目录递归遍历,归档内保留相对路径结构(以输入路径的末段名为根),
+/// 解压可还原目录层级。entry 路径用 `/` 分隔,经 [`super::archive_create`] 安全校验。
 #[cfg(feature = "archive")]
 pub fn compress_files(
     paths: &[String],
     format: ArchiveFormat,
     output: Option<&str>,
 ) -> ToolResult<String> {
-    let entries: Vec<ArchiveEntry> = paths
-        .iter()
-        .map(|p| {
-            let data = std::fs::read(p)?;
-            let path = Path::new(p)
-                .file_name()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_else(|| p.clone());
-            Ok(ArchiveEntry { path, data })
-        })
-        .collect::<ToolResult<_>>()?;
+    let mut entries = Vec::new();
+    for p in paths {
+        collect_entries(p, &mut entries)?;
+    }
     let archive = super::archive_create(&entries, format)?;
     write_output(&archive, &paths[0], output, archive_ext(format))
+}
+
+/// 收集单个路径的归档条目:文件直接读;目录递归遍历
+#[cfg(feature = "archive")]
+fn collect_entries(input: &str, entries: &mut Vec<ArchiveEntry>) -> ToolResult<()> {
+    let root = Path::new(input);
+    let root_name = root
+        .file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| input.trim_end_matches(['/', '\\']).to_string());
+    let meta = std::fs::metadata(input)?;
+    if meta.is_file() {
+        let data = std::fs::read(input)?;
+        entries.push(ArchiveEntry {
+            path: root_name,
+            data,
+        });
+    } else if meta.is_dir() {
+        collect_dir(root, &root_name, entries)?;
+    } else {
+        return Err(ToolError::InvalidInput(format!(
+            "不支持的路径类型(非文件/目录): {input}"
+        )));
+    }
+    Ok(())
+}
+
+/// 递归遍历目录:每个文件生成一条目,路径为 `prefix/相对子路径`(归档内统一 `/` 分隔)
+#[cfg(feature = "archive")]
+fn collect_dir(dir: &Path, prefix: &str, entries: &mut Vec<ArchiveEntry>) -> ToolResult<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let rel = format!("{prefix}/{name}");
+        let meta = entry.metadata()?;
+        if meta.is_file() {
+            let data = std::fs::read(entry.path())?;
+            entries.push(ArchiveEntry { path: rel, data });
+        } else if meta.is_dir() {
+            collect_dir(&entry.path(), &rel, entries)?;
+        }
+    }
+    Ok(())
 }
 
 /// 归档互转并落盘(默认输出到源文件旁),返回产物路径
@@ -288,5 +327,87 @@ fn resolve_extract_dir(input: &str, output_dir: Option<&str>) -> ToolResult<Stri
             |p| std::fs::create_dir(p),
             "碰撞次数过多:同名解压目录已存在 100 个",
         ),
+    }
+}
+
+#[cfg(all(test, feature = "archive"))]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    /// 临时目录隔离:每个测试唯一前缀,结束清理
+    struct TempDir(PathBuf);
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!("nextool_{name}"));
+            let _ = fs::remove_dir_all(&path);
+            fs::create_dir_all(&path).unwrap();
+            TempDir(path)
+        }
+        fn join(&self, rel: &str) -> String {
+            self.0.join(rel).to_string_lossy().into_owned()
+        }
+    }
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn compress_directory_preserves_structure() {
+        let tmp = TempDir::new("compress_dir");
+        fs::create_dir_all(tmp.0.join("root/sub")).unwrap();
+        fs::write(tmp.0.join("root/a.txt"), b"aaa").unwrap();
+        fs::write(tmp.0.join("root/sub/b.txt"), b"bbb").unwrap();
+
+        let input = tmp.join("root");
+        let out = compress_files(&[input], ArchiveFormat::Zip, None).unwrap();
+
+        let data = fs::read(&out).unwrap();
+        let entries = crate::archive_extract(&data).unwrap();
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert!(paths.contains(&"root/a.txt"), "缺 root/a.txt: {paths:?}");
+        assert!(
+            paths.contains(&"root/sub/b.txt"),
+            "缺 root/sub/b.txt: {paths:?}"
+        );
+    }
+
+    #[test]
+    fn compress_single_file_keeps_basename() {
+        let tmp = TempDir::new("compress_single");
+        fs::write(tmp.0.join("a.txt"), b"aaa").unwrap();
+
+        let input = tmp.join("a.txt");
+        let out = compress_files(&[input], ArchiveFormat::Zip, None).unwrap();
+
+        let data = fs::read(&out).unwrap();
+        let entries = crate::archive_extract(&data).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].path, "a.txt");
+        assert_eq!(entries[0].data, b"aaa");
+    }
+
+    #[test]
+    fn compress_mixed_files_and_dirs() {
+        let tmp = TempDir::new("compress_mixed");
+        fs::write(tmp.0.join("top.txt"), b"t").unwrap();
+        fs::create_dir_all(tmp.0.join("d")).unwrap();
+        fs::write(tmp.0.join("d/inner.txt"), b"i").unwrap();
+
+        let out = compress_files(
+            &[tmp.join("top.txt"), tmp.join("d")],
+            ArchiveFormat::Tar,
+            None,
+        )
+        .unwrap();
+
+        let data = fs::read(&out).unwrap();
+        let entries = crate::archive_extract(&data).unwrap();
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert!(paths.contains(&"top.txt"), "缺 top.txt: {paths:?}");
+        assert!(paths.contains(&"d/inner.txt"), "缺 d/inner.txt: {paths:?}");
     }
 }
