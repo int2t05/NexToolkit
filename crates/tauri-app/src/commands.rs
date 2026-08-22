@@ -52,6 +52,7 @@ fn parse_archive_format(s: &str) -> CmdResult<ArchiveFormat> {
         "tar" => ArchiveFormat::Tar,
         "targz" => ArchiveFormat::TarGz,
         "gz" => ArchiveFormat::Gz,
+        "7z" => ArchiveFormat::SevenZ,
         _ => return Err(CmdError(format!("未知归档格式: {s}"))),
     })
 }
@@ -108,6 +109,10 @@ pub fn hex_decode(input: String) -> CmdResult<String> {
 pub fn jwt_decode(input: String) -> CmdResult<String> {
     Ok(nextool_core::jwt_decode(&input)?)
 }
+#[tauri::command]
+pub fn jwt_verify(input: String, key: String) -> CmdResult<String> {
+    Ok(nextool_core::jwt_verify(&input, &key)?)
+}
 
 // 转换
 
@@ -142,6 +147,11 @@ pub fn md_to_html(input: String) -> CmdResult<String> {
 #[tauri::command]
 pub fn numbase_convert(input: String, from: u32, to: u32) -> CmdResult<String> {
     Ok(nextool_core::numbase_convert(&input, from, to)?)
+}
+#[tauri::command]
+pub fn unit_convert(value: f64, from: String, to: String) -> CmdResult<String> {
+    let result = nextool_core::unit_convert(value, &from, &to)?;
+    Ok(format!("{result}"))
 }
 
 // 格式化
@@ -272,6 +282,15 @@ pub fn rsa_decrypt(input: String, priv_pem: String) -> CmdResult<String> {
     Ok(nextool_core::rsa_decrypt(&input, &priv_pem)?)
 }
 #[tauri::command]
+pub fn rsa_sign(input: String, priv_pem: String) -> CmdResult<String> {
+    Ok(nextool_core::rsa_sign(&input, &priv_pem)?)
+}
+#[tauri::command]
+pub fn rsa_verify(input: String, pub_pem: String, signature: String) -> CmdResult<String> {
+    nextool_core::rsa_verify(&input, &pub_pem, &signature)?;
+    Ok("签名验证通过".into())
+}
+#[tauri::command]
 pub fn pbkdf2(input: String, salt: String, iterations: u32) -> CmdResult<String> {
     Ok(nextool_core::kdf_pbkdf2(&input, &salt, iterations)?)
 }
@@ -305,6 +324,11 @@ pub fn cron_next(input: String, count: usize) -> CmdResult<String> {
 #[tauri::command]
 pub fn dns_lookup(input: String, rtype: String) -> CmdResult<String> {
     Ok(nextool_core::dns_lookup(&input, &rtype)?)
+}
+#[tauri::command]
+pub fn http_probe(url: String) -> CmdResult<String> {
+    let probe = nextool_core::http_probe(&url)?;
+    Ok(probe.to_display())
 }
 
 // 文件转换:归档(command 接收路径,委托 fileconv::fs_util 落盘,返回路径或路径列表)

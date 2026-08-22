@@ -9,16 +9,20 @@ pub mod crypto;
 pub mod encode;
 pub mod format;
 pub mod generate;
+pub mod http;
 pub mod nettime;
 pub mod text;
+pub mod unit;
 
 pub use convert::*;
 pub use crypto::*;
 pub use encode::*;
 pub use format::*;
 pub use generate::*;
+pub use http::*;
 pub use nettime::*;
 pub use text::*;
+pub use unit::*;
 
 /// 核心错误类型:统一错误来源,供 CLI/GUI 转换为用户可读信息
 #[derive(Debug, thiserror::Error)]

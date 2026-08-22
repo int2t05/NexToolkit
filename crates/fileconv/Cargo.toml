@@ -14,6 +14,7 @@ nextool-core = { path = "../core" }
 zip = { version = "2", optional = true }
 tar = { version = "0.4", optional = true }
 flate2 = { version = "1", optional = true }
+sevenz-rust2 = { version = "0.21", optional = true }
 
 # image(feature-gated):仅常用栅格格式,控制体积
 image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "tiff", "ico"] }
@@ -23,6 +24,6 @@ lopdf = { version = "0.44", optional = true, default-features = false }
 
 [features]
 default = ["archive", "image", "pdf"]
-archive = ["dep:zip", "dep:tar", "dep:flate2"]
+archive = ["dep:zip", "dep:tar", "dep:flate2", "dep:sevenz-rust2"]
 image = ["dep:image"]
 pdf = ["dep:lopdf"]

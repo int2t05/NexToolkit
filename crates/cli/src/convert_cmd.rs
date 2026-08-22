@@ -35,6 +35,12 @@ enum ConvertCmd {
         to: u32,
         input: Option<String>,
     },
+    /// 单位换算:unit <value> <from> <to>(长度/面积/体积/质量/温度/时间/速度/数据/能量/频率)
+    Unit {
+        value: f64,
+        from: String,
+        to: String,
+    },
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -84,6 +90,11 @@ pub fn run(args: ConvertArgs) -> Result<(), String> {
                 "{}",
                 nextool_core::numbase_convert(&input, from, to).map_err(|e| e.to_string())?
             );
+        }
+        ConvertCmd::Unit { value, from, to } => {
+            let result =
+                nextool_core::unit_convert(value, &from, &to).map_err(|e| e.to_string())?;
+            println!("{result}");
         }
     }
     Ok(())

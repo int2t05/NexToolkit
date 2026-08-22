@@ -16,18 +16,18 @@ flowchart LR
 
 **卖点:** 零上传(隐私)、无大小限制、无网络依赖、编码/加密能力。
 
-## 工具矩阵(共 42,纯 Rust)
+## 工具矩阵(共 47,纯 Rust)
 
 | 分组 | 工具 | 说明 |
 |---|---|---|
-| Encoders | base64 · url · html · hex · jwt | 编解码;jwt 解析 header/payload 不验签 |
-| Converters | json-yaml · json-toml · json-csv · md-html · numbase | 结构化互转;numbase 进制转换 |
+| Encoders | base64 · url · html · hex · jwt · jwt-verify | 编解码;jwt 解析/验签(HS256/RS256) |
+| Converters | json-yaml · json-toml · json-csv · md-html · numbase · unit | 结构化互转 + 进制/单位换算(10 类) |
 | Formatters | json-fmt · sql-fmt · xml-fmt · css-min | 美化与压缩 |
 | Generators | hash · hmac · uuid · password · lorem · qr | hash 含 MD5/SHA1/SHA256/SHA512;uuid v4/v7;qr 生成 SVG |
 | Text | case · sort-dedup · reverse · regex · diff | case 含 snake/camel/kebab/title;diff 文本逐行 |
-| Crypto | aes-gcm · rsa · kdf | AES-GCM 加解密;RSA 密钥生成/加解密;kdf 含 PBKDF2/Argon2 |
-| Net/Time | ipcalc · timestamp · cron · dns | IP/子网计算;时间戳互转;cron 下次触发;DNS 查询 |
-| Files | archive extract · compress · convert · list · image convert · resize · pdf split · rotate · encrypt · decrypt | zip/tar/gz/tar.gz 归档 + 图像互转缩放 + PDF 拆分旋转加解密;产物落源目录 |
+| Crypto | aes-gcm · rsa · rsa-sign · rsa-verify · kdf | AES-GCM;RSA 密钥/加解密/签名验签;kdf PBKDF2/Argon2 |
+| Net/Time | ipcalc · timestamp · cron · dns · http | IP/时间戳/cron/DNS + HTTP 探测 |
+| Files | archive(含 7z 解压) · image · pdf | zip/tar/gz/7z 归档 + 图像互转缩放 + PDF 拆分旋转加解密;产物落源目录 |
 
 ## 验收
 

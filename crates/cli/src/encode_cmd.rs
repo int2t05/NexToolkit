@@ -22,6 +22,12 @@ enum EncodeCmd {
     Hex { mode: Mode, input: Option<String> },
     /// JWT 解码(不验签,输出 header/payload JSON)
     Jwt { input: Option<String> },
+    /// JWT 验签:--key(HS256 secret 或 RS256 公钥 PEM),通过输出 payload JSON
+    JwtVerify {
+        #[arg(long)]
+        key: String,
+        input: Option<String>,
+    },
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -69,6 +75,21 @@ pub fn run(args: EncodeArgs) -> Result<(), String> {
             println!(
                 "{}",
                 nextool_core::jwt_decode(&input).map_err(|e| e.to_string())?
+            );
+        }
+        EncodeCmd::JwtVerify { key, input } => {
+            let input = read_input(input)?;
+            // key 若以 -----BEGIN 视为内联 PEM,否则作 HS256 secret(也可文件路径)
+            let key = if key.starts_with("-----BEGIN") {
+                key
+            } else if std::path::Path::new(&key).exists() {
+                std::fs::read_to_string(&key).map_err(|e| format!("读取 key 文件失败: {e}"))?
+            } else {
+                key
+            };
+            println!(
+                "{}",
+                nextool_core::jwt_verify(&input, &key).map_err(|e| e.to_string())?
             );
         }
     }

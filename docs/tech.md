@@ -48,11 +48,14 @@ NexToolkit/
 
 core 为文本域(`&str→String`,47 函数),fileconv 为字节域(`&[u8]→Vec<u8>`)。归档/图像是二进制数据,强制 String 会引入 base64 开销与 UTF-8 错误风险,故字节域独立 crate。fileconv 复用 core 的 `ToolError`(单一错误定义,无新变体),分模块:
 
-- `archive` 模块:归档纯内存逻辑(解压/压缩/互转/检测/路径安全),feature gate。
+- `archive` 模块:归档纯内存逻辑(解压/压缩/互转/检测/路径安全,含 7z 解压),feature gate。
 - `image` 模块:图像纯内存逻辑(格式互转/缩放/检测),feature gate;仅启用常用栅格格式(png/jpeg/gif/bmp/webp/tiff/ico)控制体积。
 - `pdf` 模块:PDF 纯内存逻辑(拆分/旋转/加密/解密/加密检测),feature gate;lopdf default-features=false 去重依赖。
+- `engine` 模块:外部引擎子进程桥接(ffmpeg/LibreOffice/calibre/ghostscript/tesseract),运行时探测 + 命令构造,无 feature gate。
 - `path` 模块:纯字符串路径计算(产物路径 + 碰撞后缀),无 feature gate,各域复用。
 - `fs_util` 模块:IO 边界,组合各域纯逻辑 + `std::fs` 落盘(产物落源目录 + `create_new` 碰撞处理),函数级 feature gate,供 CLI/GUI 共享,避免边界逻辑重复。
+
+core 新增纯 Rust 域:`http`(URL 探测,ureq/rustls)、`unit`(单位换算 10 类,纯数学);crypto 加 rsa_sign/rsa_verify;encode 加 jwt_verify。
 
 ## 模块设计
 

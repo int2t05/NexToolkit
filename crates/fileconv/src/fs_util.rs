@@ -99,6 +99,7 @@ fn archive_ext(fmt: ArchiveFormat) -> &'static str {
         ArchiveFormat::Tar => "tar",
         ArchiveFormat::TarGz => "tar.gz",
         ArchiveFormat::Gz => "gz",
+        ArchiveFormat::SevenZ => "7z",
     }
 }
 

@@ -38,6 +38,20 @@ enum CryptoCmd {
         priv_pem: String,
         input: Option<String>,
     },
+    /// RSA 签名:--priv-pem 私钥,返回 base64 签名
+    RsaSign {
+        #[arg(long)]
+        priv_pem: String,
+        input: Option<String>,
+    },
+    /// RSA 验签:--pub-pem 公钥 + 签名参数,验证通过退出 0
+    RsaVerify {
+        #[arg(long)]
+        pub_pem: String,
+        #[arg(long)]
+        signature: String,
+        input: Option<String>,
+    },
     /// PBKDF2 派生:--salt --iterations
     Pbkdf2 {
         #[arg(long)]
@@ -100,6 +114,24 @@ pub fn run(args: CryptoArgs) -> Result<(), String> {
                 "{}",
                 nextool_core::rsa_decrypt(&input, &pem).map_err(|e| e.to_string())?
             );
+        }
+        CryptoCmd::RsaSign { priv_pem, input } => {
+            let pem = load_pem(&priv_pem)?;
+            let input = read_input(input)?;
+            println!(
+                "{}",
+                nextool_core::rsa_sign(&input, &pem).map_err(|e| e.to_string())?
+            );
+        }
+        CryptoCmd::RsaVerify {
+            pub_pem,
+            signature,
+            input,
+        } => {
+            let pem = load_pem(&pub_pem)?;
+            let input = read_input(input)?;
+            nextool_core::rsa_verify(&input, &pem, &signature).map_err(|e| e.to_string())?;
+            println!("签名验证通过");
         }
         CryptoCmd::Pbkdf2 {
             salt,
