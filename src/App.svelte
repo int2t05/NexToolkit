@@ -283,17 +283,18 @@
 
   <section class="panel">
     {#if selectedTool}
+      {@const tool = selectedTool}
       <div class="tool-header">
-        <h2>{selectedTool.name}</h2>
-        <button class="fav-btn" class:active={favorites.has(selectedTool.id)} onclick={() => toggleFavorite(selectedTool.id)} title={t('收藏', 'Favorite')}>
-          {favorites.has(selectedTool.id) ? '★' : '☆'}
+        <h2>{tool.name}</h2>
+        <button class="fav-btn" class:active={favorites.has(tool.id)} onclick={() => toggleFavorite(tool.id)} title={t('收藏', 'Favorite')}>
+          {favorites.has(tool.id) ? '★' : '☆'}
         </button>
       </div>
-      <p class="desc">{selectedTool.desc}</p>
+      <p class="desc">{tool.desc}</p>
 
-      {#if selectedTool.params.length > 0}
+      {#if tool.params.length > 0}
         <div class="params">
-          {#each selectedTool.params as p}
+          {#each tool.params as p}
             <label class="param">
               <span>{p.label}</span>
               {#if p.kind === 'textarea'}
@@ -323,7 +324,7 @@
         </div>
       {/if}
 
-      {#if selectedTool.needs_main_input}
+      {#if tool.needs_main_input}
         <textarea
           class="main-input"
           rows="8"
