@@ -14,7 +14,7 @@
 
 - **Rust** 1.80,edition 2021(workspace,`resolver = "2"`)
 - **Tauri** 2(桌面 GUI,系统 WebView)
-- **Svelte 5**(runes)+ **Vite** 5.4 + **TypeScript** 5.5(前端)
+- **Svelte 5**(runes)+ **Vite** 5.4 + **TypeScript** 5.5(前端);运行时 highlight.js(代码高亮)· @lucide/svelte(图标)
 - **clap** 4(CLI,derive)
 - **核心库**:serde / serde_json / thiserror / strum;flate2 · zip · tar · sevenz-rust2(归档);image 0.25(栅格,7 格式 feature gate);lopdf 0.44(pdf,`default-features = false`);rsa · aes-gcm · argon2 · pbkdf2(加密);pulldown-cmark;ureq(rustls TLS,无 OpenSSL)
 - **运行时/包管理**:Node 24 + npm(lockfile 入库);Windows 用 MSVC target(gnu target 编译 windows-sys 触发 ICE)
@@ -35,7 +35,11 @@ crates/
         archive.rs image.rs pdf.rs engine.rs fs_util.rs path.rs  mod.rs
   cli/                   # clap 子命令;tests/cli_smoke.rs(assert_cmd,真实二进制)
   tauri-app/             # 13 个 Tauri 命令:10 文件 + list_tools / run_tool / list_file_tools
-src/                     # Svelte 5 前端:App.svelte(动态渲染)· bindings.ts · main.ts
+src/                     # Svelte 5 前端
+  App.svelte             # 外壳:布局 + onMount 加载 + 全局 keydown
+  lib/                   # state.svelte.ts($state 单例)· types.ts · format.ts · styles/tokens.css(设计 token)
+  components/            # TopBar · Sidebar(功能树)· ToolPanel · ParamForm · OutputArea · CommandPalette
+  bindings.ts · main.ts
 docs/                    # prd · tech · api · flow · todo(+ audit/ design/ 历史)
 ```
 

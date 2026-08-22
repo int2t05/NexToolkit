@@ -1,8 +1,33 @@
-/* 全局基础样式:暗色主题,系统字体,滚动条 */
+/* 全局基础样式:走设计 token(--ntx-*,见 lib/styles/tokens.css)。
+ * 组件级样式在各 .svelte 内联 <style>;此处只放 reset / 滚动条 / 选区 / 焦点 / hljs token。 */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
+}
+
+body {
+  font-family: var(--ntx-font-sans);
+  background: var(--ntx-bg);
+  color: var(--ntx-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--ntx-primary-soft);
+  color: var(--ntx-fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ntx-primary);
+  outline-offset: 2px;
 }
 
 ::-webkit-scrollbar {
@@ -10,9 +35,48 @@ body {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2d35;
-  border-radius: 4px;
+  background: var(--ntx-border-strong);
+  border-radius: var(--ntx-radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ntx-fg-subtle);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* highlight.js token:暗色,走设计 token(替换原 App.svelte 内联 :global(.hljs-*)) */
+.hljs {
+  color: var(--ntx-fg);
+}
+.hljs-keyword {
+  color: var(--ntx-hljs-keyword);
+}
+.hljs-string {
+  color: var(--ntx-hljs-string);
+}
+.hljs-number {
+  color: var(--ntx-hljs-number);
+}
+.hljs-comment {
+  color: var(--ntx-hljs-comment);
+  font-style: italic;
+}
+.hljs-attr {
+  color: var(--ntx-hljs-attr);
+}
+.hljs-tag {
+  color: var(--ntx-hljs-tag);
+}
+.hljs-built_in {
+  color: var(--ntx-hljs-built_in);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

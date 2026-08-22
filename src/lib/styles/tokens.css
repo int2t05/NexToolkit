@@ -1,0 +1,84 @@
+/* NexToolkit 设计 token · 暗色单主题
+ * 色彩空间:oklch(感知均匀,支持 color-mix 生成分类标记等派生色)
+ * 命名前缀:--ntx-。仅暗色一套(不做明色主题)。
+ * 调研依据:nexine(--nx- 暗色骨架)/ youran-toolbox(分类色 + color-mix)
+ */
+
+:root {
+  /* ── 表面(冷调蓝灰中性阶)────────────────────────── */
+  --ntx-bg: oklch(0.14 0.015 264); /* 最深底 ~#0f1115 */
+  --ntx-surface: oklch(0.18 0.015 264); /* 顶栏/侧栏 ~#16181d */
+  --ntx-surface-2: oklch(0.22 0.015 264); /* 悬停/输入 ~#1c1f25 */
+  --ntx-surface-3: oklch(0.26 0.015 264); /* 浮层 ~#23262e */
+  --ntx-border: oklch(0.28 0.015 264); /* ~#2a2d35 */
+  --ntx-border-strong: oklch(0.34 0.015 264); /* ~#333b48 */
+
+  /* ── 文字 ────────────────────────────────────────── */
+  --ntx-fg: oklch(0.90 0.005 264); /* 主文字 ~#e4e6eb */
+  --ntx-fg-muted: oklch(0.68 0.010 264); /* 次要 ~#a9adb5 */
+  --ntx-fg-subtle: oklch(0.55 0.010 264); /* 提示/标签 ~#6b7280 */
+
+  /* ── 主色(蓝)────────────────────────────────────── */
+  --ntx-primary: oklch(0.55 0.20 264); /* ~#2563eb */
+  --ntx-primary-hover: oklch(0.60 0.20 264); /* 悬停略亮 */
+  --ntx-primary-fg: oklch(0.98 0 0); /* 主色按钮文字 */
+  --ntx-primary-soft: color-mix(in oklch, var(--ntx-primary) 14%, var(--ntx-surface)); /* 选中态背景 */
+
+  /* ── 语义色 ──────────────────────────────────────── */
+  --ntx-success: oklch(0.70 0.15 145); /* ~#3fb950 */
+  --ntx-success-soft: color-mix(in oklch, var(--ntx-success) 12%, var(--ntx-surface));
+  --ntx-danger: oklch(0.65 0.20 25); /* ~#f2555a */
+  --ntx-danger-soft: color-mix(in oklch, var(--ntx-danger) 14%, var(--ntx-surface));
+  --ntx-warning: oklch(0.75 0.15 75); /* ~#d9a441 */
+  --ntx-info: oklch(0.70 0.15 230);
+
+  /* ── 分类色(8 组,功能树标记)───────────────────────
+   * 色相均匀分布在色环上,chroma/lightness 一致以保暗背景下可辨 */
+  --ntx-cat-encode: oklch(0.70 0.15 145); /* 绿 */
+  --ntx-cat-convert: oklch(0.65 0.18 264); /* 蓝 */
+  --ntx-cat-format: oklch(0.70 0.15 295); /* 紫 */
+  --ntx-cat-generate: oklch(0.72 0.15 195); /* 青 */
+  --ntx-cat-text: oklch(0.75 0.13 55); /* 琥珀 */
+  --ntx-cat-crypto: oklch(0.65 0.18 15); /* 红 */
+  --ntx-cat-nettime: oklch(0.70 0.15 325); /* 品红 */
+  --ntx-cat-fileconv: oklch(0.72 0.15 95); /* 黄绿 */
+
+  /* ── 收藏星标 ────────────────────────────────────── */
+  --ntx-star: oklch(0.80 0.15 85); /* ~#f5c518 */
+
+  /* ── highlight.js token(One Dark 风格)────────────── */
+  --ntx-hljs-keyword: oklch(0.65 0.18 315); /* 紫 */
+  --ntx-hljs-string: oklch(0.72 0.15 135); /* 绿 */
+  --ntx-hljs-number: oklch(0.70 0.13 60); /* 橙 */
+  --ntx-hljs-comment: oklch(0.58 0.010 260); /* 灰 */
+  --ntx-hljs-attr: oklch(0.68 0.15 250); /* 蓝 */
+  --ntx-hljs-tag: oklch(0.65 0.18 20); /* 红 */
+  --ntx-hljs-built_in: oklch(0.72 0.10 200); /* 青 */
+
+  /* ── 间距(4px 基准网格)───────────────────────────── */
+  --ntx-space-1: 4px;
+  --ntx-space-2: 8px;
+  --ntx-space-3: 12px;
+  --ntx-space-4: 16px;
+  --ntx-space-5: 24px;
+  --ntx-space-6: 32px;
+
+  /* ── 字体 ────────────────────────────────────────── */
+  --ntx-font-sans: system-ui, -apple-system, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --ntx-font-mono: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+
+  /* ── 圆角 ────────────────────────────────────────── */
+  --ntx-radius-sm: 6px;
+  --ntx-radius-base: 8px;
+  --ntx-radius-lg: 12px;
+  --ntx-radius-xl: 16px;
+
+  /* ── 阴影(暗色低强度)────────────────────────────── */
+  --ntx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ntx-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --ntx-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* ── 过渡 ────────────────────────────────────────── */
+  --ntx-transition: 150ms ease;
+  --ntx-transition-fast: 100ms ease;
+}
