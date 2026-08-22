@@ -45,9 +45,11 @@ enum PdfCmd {
         #[arg(long)]
         output_dir: Option<String>,
     },
-    /// 旋转 PDF 所有页 90 度(顺时针)
+    /// 旋转 PDF 所有页(默认 90 度,--degrees 90/180/270)
     Rotate {
         input: String,
+        #[arg(long, default_value = "90")]
+        degrees: u32,
         #[arg(long)]
         output: Option<String>,
     },
@@ -85,6 +87,54 @@ enum ImageCmd {
         width: u32,
         #[arg(long)]
         height: u32,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 图像裁剪(--x/--y/--width/--height 指定区域)
+    Crop {
+        input: String,
+        #[arg(long)]
+        x: u32,
+        #[arg(long)]
+        y: u32,
+        #[arg(long)]
+        width: u32,
+        #[arg(long)]
+        height: u32,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 图像翻转(--direction h/v)
+    Flip {
+        input: String,
+        #[arg(long)]
+        direction: nextool_core::FlipDirection,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 图像滤镜(--filter grayscale/invert/sepia/blur)
+    Filter {
+        input: String,
+        #[arg(long)]
+        filter: nextool_core::FilterKind,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 亮度/对比度调整(--brightness i32/--contrast f32)
+    Adjust {
+        input: String,
+        #[arg(long, default_value = "0")]
+        brightness: i32,
+        #[arg(long, default_value = "1.0")]
+        contrast: f32,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// JPEG 压缩(--quality 1..=100)
+    CompressJpeg {
+        input: String,
+        #[arg(long)]
+        quality: u8,
         #[arg(long)]
         output: Option<String>,
     },
@@ -216,6 +266,67 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 println!("已缩放 {out}");
                 Ok(())
             }
+            ImageCmd::Crop {
+                input,
+                x,
+                y,
+                width,
+                height,
+                output,
+            } => {
+                let out =
+                    nextool_core::crop_image_file(&input, x, y, width, height, output.as_deref())
+                        .map_err(|e| e.to_string())?;
+                println!("已裁剪 {out}");
+                Ok(())
+            }
+            ImageCmd::Flip {
+                input,
+                direction,
+                output,
+            } => {
+                let out = nextool_core::flip_image_file(&input, direction, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已翻转 {out}");
+                Ok(())
+            }
+            ImageCmd::Filter {
+                input,
+                filter,
+                output,
+            } => {
+                let out = nextool_core::filter_image_file(&input, filter, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已应用滤镜 {out}");
+                Ok(())
+            }
+            ImageCmd::Adjust {
+                input,
+                brightness,
+                contrast,
+                output,
+            } => {
+                let out = nextool_core::adjust_image_file(
+                    &input,
+                    brightness,
+                    contrast,
+                    output.as_deref(),
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已调整亮度/对比度 {out}");
+                Ok(())
+            }
+            ImageCmd::CompressJpeg {
+                input,
+                quality,
+                output,
+            } => {
+                let out =
+                    nextool_core::compress_jpeg_image_file(&input, quality, output.as_deref())
+                        .map_err(|e| e.to_string())?;
+                println!("已压缩 JPEG {out}");
+                Ok(())
+            }
         },
         FileConvCmd::Pdf { cmd } => match cmd {
             PdfCmd::Split { input, output_dir } => {
@@ -224,8 +335,12 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 println!("已拆分为 {} 个 PDF", written.len());
                 Ok(())
             }
-            PdfCmd::Rotate { input, output } => {
-                let out = nextool_core::rotate_pdf(&input, output.as_deref())
+            PdfCmd::Rotate {
+                input,
+                degrees,
+                output,
+            } => {
+                let out = nextool_core::rotate_pdf(&input, degrees, output.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已旋转 {out}");
                 Ok(())

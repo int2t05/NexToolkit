@@ -7,8 +7,9 @@ mod commands;
 
 use commands::{
     archive_compress, archive_convert, archive_extract, archive_list, av_convert, ebook_convert,
-    image_convert, image_resize, list_engines, list_file_tools, list_tools, markup_convert, ocr,
-    office_to_pdf, pdf_compress, pdf_decrypt, pdf_encrypt, pdf_rotate, pdf_split, run_tool,
+    image_adjust, image_compress_jpeg, image_convert, image_crop, image_filter, image_flip,
+    image_resize, list_engines, list_file_tools, list_tools, markup_convert, ocr, office_to_pdf,
+    pdf_compress, pdf_decrypt, pdf_encrypt, pdf_rotate, pdf_split, run_tool,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,7 +27,12 @@ pub fn run() {
             archive_extract,
             archive_compress,
             archive_convert,
+            image_adjust,
+            image_compress_jpeg,
             image_convert,
+            image_crop,
+            image_filter,
+            image_flip,
             image_resize,
             pdf_split,
             pdf_rotate,

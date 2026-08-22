@@ -171,6 +171,74 @@ pub fn resize_image_file(
     write_output(&out_data, input, output, fmt.ext())
 }
 
+/// 图像裁剪并落盘(默认输出到源文件旁,同格式),返回产物路径
+#[cfg(feature = "image")]
+pub fn crop_image_file(
+    input: &str,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_crop(&data, x, y, width, height, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
+}
+
+/// 图像翻转并落盘(默认输出到源文件旁,同格式),返回产物路径
+#[cfg(feature = "image")]
+pub fn flip_image_file(
+    input: &str,
+    direction: super::image::FlipDirection,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_flip(&data, direction, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
+}
+
+/// 图像滤镜并落盘(默认输出到源文件旁,同格式),返回产物路径
+#[cfg(feature = "image")]
+pub fn filter_image_file(
+    input: &str,
+    filter: super::image::FilterKind,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_filter(&data, filter, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
+}
+
+/// 亮度/对比度调整并落盘(默认输出到源文件旁,同格式),返回产物路径
+#[cfg(feature = "image")]
+pub fn adjust_image_file(
+    input: &str,
+    brightness: i32,
+    contrast: f32,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_adjust(&data, brightness, contrast, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
+}
+
+/// JPEG 压缩并落盘(输出 JPEG 格式,默认源文件旁 .jpg),返回产物路径
+#[cfg(feature = "image")]
+pub fn compress_jpeg_image_file(
+    input: &str,
+    quality: u8,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::image_compress_jpeg(&data, quality)?;
+    write_output(&out_data, input, output, "jpg")
+}
+
 // ---- PDF IO(pdf feature)----
 
 /// 拆分 PDF:每页一个独立 PDF,输出到源文件旁 `{stem}_split_{n}.pdf`,返回产物路径列表
@@ -202,11 +270,13 @@ pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String
     Ok(written)
 }
 
-/// 旋转 PDF 并落盘(默认输出到源文件旁),返回产物路径
+/// 旋转 PDF 指定角度并落盘(默认输出到源文件旁),返回产物路径
+///
+/// `degrees` 须为 90/180/270。
 #[cfg(feature = "pdf")]
-pub fn rotate_pdf(input: &str, output: Option<&str>) -> ToolResult<String> {
+pub fn rotate_pdf(input: &str, degrees: u32, output: Option<&str>) -> ToolResult<String> {
     let data = std::fs::read(input)?;
-    let out_data = super::pdf_rotate(&data)?;
+    let out_data = super::pdf_rotate(&data, degrees)?;
     write_output(&out_data, input, output, "pdf")
 }
 

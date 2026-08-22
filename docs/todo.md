@@ -331,13 +331,13 @@
 | # | 格式 | 扩展名 | 解码 | 编码 | 互转对数(与现 7 格式) | 依赖(feature) | 状态 |
 |---|---|---|---|---|---|---|---|
 | I-01 | AVIF | `.avif` | ✓(需 `avif-native` 或 dav1d) | ✓(ravif,纯 Rust) | +14(7 入 × 2 出 AVIF) | `avif` feature | ☐ 纯 Rust(编码)/ C 绑定(解码) |
-| I-02 | DDS | `.dds` | ✓ | ✗(只解码) | +7(DDS → 7 格式) | `dds` feature | ☐ 纯 Rust |
-| I-03 | Farbfeld | `.ff` | ✓ | ✓ | +14 | `ff` feature | ☐ 纯 Rust |
-| I-04 | HDR(Radiance) | `.hdr` | ✓ | ✓ | +14 | `hdr` feature | ☐ 纯 Rust |
-| I-05 | OpenEXR | `.exr` | ✓ | ✓ | +14 | `exr` feature | ☐ 纯 Rust |
-| I-06 | PNM | `.pbm/.pgm/.ppm/.pam` | ✓ | ✓ | +14(4 子格式 × 7) | `pnm` feature | ☐ 纯 Rust |
-| I-07 | QOI | `.qoi` | ✓ | ✓ | +14 | `qoi` feature | ☐ 纯 Rust |
-| I-08 | TGA | `.tga` | ✓ | ✓ | +14 | `tga` feature | ☐ 纯 Rust |
+| I-02 | DDS | `.dds` | ✓ | ✗(只解码) | +7(DDS → 7 格式) | `dds` feature | ✓ 纯 Rust(只解码) |
+| I-03 | Farbfeld | `.ff` | ✓ | ✓ | +14 | `ff` feature | ✓ 纯 Rust |
+| I-04 | HDR(Radiance) | `.hdr` | ✓ | ✓ | +14 | `hdr` feature | ✓ 纯 Rust |
+| I-05 | OpenEXR | `.exr` | ✓ | ✓ | +14 | `exr` feature | ✓ 纯 Rust |
+| I-06 | PNM | `.pbm/.pgm/.ppm/.pam` | ✓ | ✓ | +14(4 子格式 × 7) | `pnm` feature | ✓ 纯 Rust |
+| I-07 | QOI | `.qoi` | ✓ | ✓ | +14 | `qoi` feature | ✓ 纯 Rust |
+| I-08 | TGA | `.tga` | ✓ | ✓ | +14 | `tga` feature | ✓ 纯 Rust |
 
 **启用这 8 格式后新增互转对**:
 - 双向格式(AVIF/FF/HDR/EXR/PNM/QOI/TGA):7 × 2 × 7 = **98 对**
@@ -366,17 +366,17 @@
 
 | # | 功能 | 依赖 | 状态 |
 |---|---|---|---|
-| I-18 | 图像裁剪(区域选取) | image(纯 Rust) | ☐ |
-| I-19 | 图像旋转/翻转(90/180/270/H/V) | image | ☐ |
+| I-18 | 图像裁剪(区域选取) | image(纯 Rust) | ✓ |
+| I-19 | 图像旋转/翻转(90/180/270/H/V) | image | ✓(翻转 H/V;旋转走 PDF/P-06) |
 | I-20 | 图像水印(文字/图片叠加) | image + rusttype | ☐ |
-| I-21 | 图像压缩(质量降低) | image/jpeg encoder | ☐ |
+| I-21 | 图像压缩(质量降低) | image/jpeg encoder | ✓ |
 | I-22 | 图像色彩深度(8/16/24/32 位) | image | ☐ |
-| I-23 | 图像滤镜(灰度/反相/棕褐/模糊) | image | ☐ |
+| I-23 | 图像滤镜(灰度/反相/棕褐/模糊) | image | ✓ |
 | I-24 | 图像 EXIF 查看/编辑/清除 | 纯 Rust(kamadak-exif) | ☐ |
 | I-25 | 图像 DPI/PPI 修改 | image | ☐ |
 | I-26 | 图像转 PDF(多图合并 PDF) | printpdf | ☐ |
 | I-27 | 图像批量调整大小 | image(已有 resize,缺批量入口) | ☐ |
-| I-28 | 图像颜色调整(亮度/对比度/饱和度) | image | ☐ |
+| I-28 | 图像颜色调整(亮度/对比度/饱和度) | image | ✓(亮度/对比度;饱和度待补) |
 | I-29 | 图像拼贴(多图拼接) | image | ☐ |
 | I-30 | 图像到 Word(DOCX 内嵌图) | 纯 Rust(docx-rs) | ☐ |
 
@@ -457,8 +457,8 @@
 | P-02 | PDF 拆分 | — | 每 N 页一个 PDF | ☐ |
 | P-03 | PDF 拆分 | — | 奇/偶页分离 | ☐ |
 | P-04 | PDF 拆分 | — | 半页拆分(双栏分离) | ☐ |
-| P-05 | PDF 旋转 | 全页 90° 顺时针 | 单页旋转(指定页码) | ☐ |
-| P-06 | PDF 旋转 | — | 180°/270° | ☐ |
+| P-05 | PDF 旋转 | 全页 90° 顺时针 | 单页旋转(指定页码) | ☐(P-06 已做角度) |
+| P-06 | PDF 旋转 | — | 180°/270° | ✓ |
 | P-07 | PDF 旋转 | — | 按方向筛选(横/纵页) | ☐ |
 | P-08 | PDF 加密 | AES owner=user 同口令 | 权限分离(打印/复制/编辑限制) | ☐ |
 
@@ -588,14 +588,14 @@
 
 | # | 功能 | 状态 |
 |---|---|---|
-| T-01 | Base32 编解码 | ☐ 纯 Rust |
-| T-02 | Base58 编解码 | ☐ 纯 Rust |
-| T-03 | Base85/Ascii85 编解码 | ☐ 纯 Rust |
-| T-04 | Punycode 编解码(域名) | ☐ 纯 Rust |
-| T-05 | Quoted-Printable 编解码 | ☐ 纯 Rust |
-| T-06 | Morse 编解码 | ☐ 纯 Rust |
-| T-07 | Braille 编解码 | ☐ 纯 Rust |
-| T-08 | Binary ↔ 文本(零宽字符隐写) | ☐ 纯 Rust |
+| T-01 | Base32 编解码 | ✓ 纯 Rust(RFC 4648) |
+| T-02 | Base58 编解码 | ✓ 纯 Rust(bs58,Bitcoin) |
+| T-03 | Base85/Ascii85 编解码 | ✓ 纯 Rust(Ascii85 Adobe) |
+| T-04 | Punycode 编解码(域名) | ✓ 纯 Rust(RFC 3492) |
+| T-05 | Quoted-Printable 编解码 | ✓ 纯 Rust(RFC 2045) |
+| T-06 | Morse 编解码 | ✓ 纯 Rust(国际摩斯码) |
+| T-07 | Braille 编解码 | ✓ 纯 Rust(Unicode 6 点) |
+| T-08 | Binary ↔ 文本(零宽字符隐写) | ✓ 纯 Rust(U+200B/200C) |
 
 ### 9.2 文本处理补充
 

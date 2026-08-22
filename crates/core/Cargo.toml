@@ -18,6 +18,9 @@ strum = { version = "0.26", features = ["derive"] }
 urlencoding = "2.1"
 html-escape = "0.2"
 hex = "0.4"
+bs58 = "0.5"
+punycode = "0.4"
+quoted_printable = "0.5"
 
 # convert
 serde_yaml = "0.9"
@@ -65,8 +68,8 @@ tar = { version = "0.4", optional = true }
 flate2 = { version = "1", optional = true }
 sevenz-rust2 = { version = "0.21", optional = true }
 
-# fileconv — image(feature-gated):仅常用栅格格式,控制体积
-image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "tiff", "ico"] }
+# fileconv — image(feature-gated):栅格格式(7 基础 + 7 扩展,DDS 仅解码)
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "tiff", "ico", "dds", "ff", "hdr", "exr", "pnm", "qoi", "tga"] }
 
 # fileconv — pdf(feature-gated):lopdf 默认关闭重依赖(rayon/jiff/image/serde)
 lopdf = { version = "0.44", optional = true, default-features = false }

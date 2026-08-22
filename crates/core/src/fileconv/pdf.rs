@@ -26,13 +26,18 @@ pub fn pdf_split(data: &[u8]) -> ToolResult<Vec<Vec<u8>>> {
     Ok(result)
 }
 
-/// 旋转 PDF 所有页 90 度(顺时针):每页 /Rotate 加 90 模 360
-pub fn pdf_rotate(data: &[u8]) -> ToolResult<Vec<u8>> {
+/// 旋转 PDF 所有页指定角度(顺时针):每页 /Rotate 加 degrees 模 360
+///
+/// `degrees` 须为 90/180/270,否则返回 `InvalidInput`。
+pub fn pdf_rotate(data: &[u8], degrees: u32) -> ToolResult<Vec<u8>> {
+    if !matches!(degrees, 90 | 180 | 270) {
+        return Err(ToolError::InvalidInput("旋转角度须为 90/180/270".into()));
+    }
     let mut doc = load_doc(data)?;
     let pages: Vec<_> = doc.get_pages().keys().copied().collect();
     for page_no in pages {
         let current = current_rotate(&doc, page_no);
-        set_rotate(&mut doc, page_no, (current + 90) % 360)?;
+        set_rotate(&mut doc, page_no, (current + degrees as i64) % 360)?;
     }
     save_doc(&mut doc)
 }
@@ -217,14 +222,14 @@ mod tests {
 
     #[test]
     fn rotate_still_valid() {
-        let rotated = pdf_rotate(&sample_pdf()).unwrap();
+        let rotated = pdf_rotate(&sample_pdf(), 90).unwrap();
         assert!(load_doc(&rotated).is_ok());
     }
 
     #[test]
     fn rotate_twice_180() {
-        let once = pdf_rotate(&sample_pdf()).unwrap();
-        let twice = pdf_rotate(&once).unwrap();
+        let once = pdf_rotate(&sample_pdf(), 90).unwrap();
+        let twice = pdf_rotate(&once, 90).unwrap();
         // 两次旋转后 /Rotate 应为 180
         let doc = load_doc(&twice).unwrap();
         let page_id = *doc.get_pages().values().next().unwrap();

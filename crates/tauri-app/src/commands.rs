@@ -261,7 +261,10 @@ static FILE_TOOLS: &[ToolMeta] = &[
                 kind: ParamKind::Select,
                 label: "目标格式",
                 default: Some("png"),
-                options: &["png", "jpg", "gif", "bmp", "webp", "tiff", "ico"],
+                options: &[
+                    "png", "jpg", "gif", "bmp", "webp", "tiff", "ico", "dds", "farbfeld", "hdr",
+                    "exr", "pnm", "qoi", "tga",
+                ],
                 placeholder: None,
                 multiple: false,
             },
@@ -307,6 +310,182 @@ static FILE_TOOLS: &[ToolMeta] = &[
         output_kind: OutputKind::Text,
     },
     ToolMeta {
+        id: "image_crop",
+        name: "图像裁剪",
+        desc: "区域裁剪(同格式输出)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "图像文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "x",
+                kind: ParamKind::Number,
+                label: "起点 X",
+                default: Some("0"),
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "y",
+                kind: ParamKind::Number,
+                label: "起点 Y",
+                default: Some("0"),
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "width",
+                kind: ParamKind::Number,
+                label: "裁剪宽",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "height",
+                kind: ParamKind::Number,
+                label: "裁剪高",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "image_flip",
+        name: "图像翻转",
+        desc: "水平/垂直镜像(同格式输出)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "图像文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "direction",
+                kind: ParamKind::Select,
+                label: "方向",
+                default: Some("h"),
+                options: &["h", "v"],
+                placeholder: None,
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "image_filter",
+        name: "图像滤镜",
+        desc: "灰度/反相/棕褐/模糊(同格式输出)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "图像文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "filter",
+                kind: ParamKind::Select,
+                label: "滤镜",
+                default: Some("grayscale"),
+                options: &["grayscale", "invert", "sepia", "blur"],
+                placeholder: None,
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "image_adjust",
+        name: "亮度/对比度",
+        desc: "调整亮度与对比度(同格式输出)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "图像文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "brightness",
+                kind: ParamKind::Number,
+                label: "亮度(-255..255)",
+                default: Some("0"),
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "contrast",
+                kind: ParamKind::Number,
+                label: "对比度(0.0-3.0)",
+                default: Some("1.0"),
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "image_compress_jpeg",
+        name: "JPEG 压缩",
+        desc: "按质量压缩为 JPEG",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "图像文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "quality",
+                kind: ParamKind::Number,
+                label: "质量(1-100)",
+                default: Some("80"),
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
         id: "pdf_split",
         name: "PDF 拆分",
         desc: "每页一个 PDF",
@@ -337,17 +516,28 @@ static FILE_TOOLS: &[ToolMeta] = &[
     ToolMeta {
         id: "pdf_rotate",
         name: "PDF 旋转",
-        desc: "所有页顺时针 90°",
+        desc: "所有页旋转 90/180/270°",
         group: "fileconv",
-        params: &[ParamSpec {
-            key: "path",
-            kind: ParamKind::File,
-            label: "PDF 文件",
-            default: None,
-            options: &[],
-            placeholder: None,
-            multiple: false,
-        }],
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "degrees",
+                kind: ParamKind::Number,
+                label: "角度(90/180/270)",
+                default: Some("90"),
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+        ],
         needs_main_input: false,
         output_kind: OutputKind::Text,
     },
@@ -661,16 +851,88 @@ pub fn image_resize(
     )?)
 }
 
+/// 图像裁剪(默认输出到源文件旁,同格式);返回产物路径
+#[tauri::command]
+pub fn image_crop(
+    path: String,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    output: Option<String>,
+) -> CmdResult<String> {
+    Ok(nextool_core::crop_image_file(
+        &path,
+        x,
+        y,
+        width,
+        height,
+        output.as_deref(),
+    )?)
+}
+
+/// 图像翻转(默认输出到源文件旁,同格式);返回产物路径
+#[tauri::command]
+pub fn image_flip(path: String, direction: String, output: Option<String>) -> CmdResult<String> {
+    let dir = direction
+        .parse::<nextool_core::FlipDirection>()
+        .map_err(|e| CmdError(e.to_string()))?;
+    Ok(nextool_core::flip_image_file(
+        &path,
+        dir,
+        output.as_deref(),
+    )?)
+}
+
+/// 图像滤镜(默认输出到源文件旁,同格式);返回产物路径
+#[tauri::command]
+pub fn image_filter(path: String, filter: String, output: Option<String>) -> CmdResult<String> {
+    let f = filter
+        .parse::<nextool_core::FilterKind>()
+        .map_err(|e| CmdError(e.to_string()))?;
+    Ok(nextool_core::filter_image_file(
+        &path,
+        f,
+        output.as_deref(),
+    )?)
+}
+
+/// 亮度/对比度调整(默认输出到源文件旁,同格式);返回产物路径
+#[tauri::command]
+pub fn image_adjust(
+    path: String,
+    brightness: i32,
+    contrast: f32,
+    output: Option<String>,
+) -> CmdResult<String> {
+    Ok(nextool_core::adjust_image_file(
+        &path,
+        brightness,
+        contrast,
+        output.as_deref(),
+    )?)
+}
+
+/// JPEG 压缩(输出 JPEG 格式,默认源文件旁 .jpg);返回产物路径
+#[tauri::command]
+pub fn image_compress_jpeg(path: String, quality: u8, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::compress_jpeg_image_file(
+        &path,
+        quality,
+        output.as_deref(),
+    )?)
+}
+
 /// 拆分 PDF:每页一个独立 PDF,返回产物路径列表
 #[tauri::command]
 pub fn pdf_split(path: String, output_dir: Option<String>) -> CmdResult<Vec<String>> {
     Ok(nextool_core::split_pdf(&path, output_dir.as_deref())?)
 }
 
-/// 旋转 PDF 所有页 90 度(顺时针);返回产物路径
+/// 旋转 PDF 所有页指定角度(90/180/270);返回产物路径
 #[tauri::command]
-pub fn pdf_rotate(path: String, output: Option<String>) -> CmdResult<String> {
-    Ok(nextool_core::rotate_pdf(&path, output.as_deref())?)
+pub fn pdf_rotate(path: String, degrees: u32, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::rotate_pdf(&path, degrees, output.as_deref())?)
 }
 
 /// 加密 PDF(--password);返回产物路径
