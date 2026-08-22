@@ -34,9 +34,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// 编解码:base64/url/html/hex/jwt
+    /// 编解码:base64/url/html/hex/jwt + base32/58/85/punycode/quoted-printable/morse/braille/zero-width
     Encode(EncodeArgs),
-    /// 格式转换:json-yaml/json-toml/json-csv/md-html/numbase
+    /// 格式转换:json-yaml/json-toml/json-csv/md-html/numbase/unit
     Convert(ConvertArgs),
     /// 格式化:json/sql/xml 美化压缩、css 压缩
     Format(FormatArgs),
@@ -44,11 +44,11 @@ enum Command {
     Generate(GenerateArgs),
     /// 文本:case/sort/dedup/reverse/regex/diff
     Text(TextArgs),
-    /// 加密:aes-gcm/rsa/kdf
+    /// 加密:aes-gcm/rsa/kdf + chacha20/ed25519/bcrypt/scrypt/hmac-sha2/crc
     Crypto(CryptoArgs),
-    /// 网络/时间:ipcalc/timestamp/cron/dns
+    /// 网络/时间:ipcalc/timestamp/cron/dns/http
     NetTime(NetTimeArgs),
-    /// 文件转换:归档解压/压缩/转换
+    /// 文件转换:归档/图像/PDF/字体/SVG/引擎/电子表格
     FileConv(FileConvArgs),
 }
 

@@ -6,11 +6,13 @@
 mod commands;
 
 use commands::{
-    archive_compress, archive_convert, archive_extract, archive_list, av_convert, ebook_convert,
-    font_convert, font_meta, image_adjust, image_compress_jpeg, image_convert, image_crop,
-    image_filter, image_flip, image_resize, list_engines, list_file_tools, list_tools,
-    markup_convert, ocr, office_to_pdf, pdf_compress, pdf_decrypt, pdf_encrypt, pdf_rotate,
-    pdf_split, run_tool, svg_convert,
+    archive_compress, archive_convert, archive_extract, archive_list, av_convert, docx_to_text,
+    ebook_convert, font_convert, font_meta, image_adjust, image_compress_jpeg, image_convert,
+    image_crop, image_filter, image_flip, image_resize, json_to_xlsx, list_engines,
+    list_file_tools, list_tools, markup_convert, ocr, office_to_pdf, pdf_add_page_numbers,
+    pdf_compress, pdf_decrypt, pdf_delete_pages, pdf_encrypt, pdf_extract_pages, pdf_merge,
+    pdf_rotate, pdf_set_metadata, pdf_split, pdf_split_every_n, pdf_split_parity, pdf_split_ranges,
+    pdf_to_text, run_tool, svg_convert, xlsx_to_json,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -39,6 +41,14 @@ pub fn run() {
             pdf_rotate,
             pdf_encrypt,
             pdf_decrypt,
+            pdf_split_ranges,
+            pdf_split_every_n,
+            pdf_split_parity,
+            pdf_merge,
+            pdf_delete_pages,
+            pdf_extract_pages,
+            pdf_set_metadata,
+            pdf_add_page_numbers,
             // 字体转换
             font_convert,
             font_meta,
@@ -51,6 +61,12 @@ pub fn run() {
             markup_convert,
             pdf_compress,
             ocr,
+            // 电子表格
+            xlsx_to_json,
+            json_to_xlsx,
+            // 文本提取
+            pdf_to_text,
+            docx_to_text,
         ])
         .run(tauri::generate_context!())
         .expect("启动 Tauri 应用失败");

@@ -1,4 +1,4 @@
-// 纯格式化函数(无状态,从 App.svelte 抽出)
+// 纯格式化函数(无状态)
 
 /** HTML 转义:输出区与 SVG 直渲染前的安全处理 */
 export function escapeHtml(s: string): string {

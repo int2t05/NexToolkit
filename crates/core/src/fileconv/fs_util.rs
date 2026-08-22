@@ -249,6 +249,18 @@ pub fn compress_jpeg_image_file(
 pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String>> {
     let data = std::fs::read(input)?;
     let parts = super::pdf_split(&data)?;
+    write_split_parts(&parts, input, output_dir)
+}
+
+/// 拆分产物批量落盘:到 `output_dir` 或源文件旁 `{stem}_extracted/`,命名 `{stem}_split_{n}.pdf`
+///
+/// 碰撞追加 `(1)`/`(2)`(经 [`write_bytes_safe`])。供 [`split_pdf`] 与范围/每 N 页拆分复用。
+#[cfg(feature = "pdf")]
+fn write_split_parts(
+    parts: &[Vec<u8>],
+    input: &str,
+    output_dir: Option<&str>,
+) -> ToolResult<Vec<String>> {
     if parts.is_empty() {
         return Ok(Vec::new());
     }
@@ -265,7 +277,7 @@ pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String
         .unwrap_or_else(|| "split".into());
     let mut written = Vec::with_capacity(parts.len());
     for (i, part) in parts.iter().enumerate() {
-        // 碰撞:_split_0 → _split_0(1) ...
+        // 碰撞:_split_1 → _split_1(1) ...
         let base = format!("{dir}/{}_split_{}", stem, i + 1);
         let path = write_bytes_safe(part, &format!("{base}.pdf"), "pdf")?;
         written.push(path);
@@ -304,6 +316,99 @@ pub fn decrypt_pdf(input: &str, password: &str, output: Option<&str>) -> ToolRes
 pub fn is_pdf_encrypted_file(path: &str) -> ToolResult<bool> {
     let data = std::fs::read(path)?;
     super::pdf_is_encrypted(&data)
+}
+
+/// 按自定义范围拆分 PDF 落盘:每段一个 PDF,返回产物路径列表
+#[cfg(feature = "pdf")]
+pub fn split_pdf_ranges(
+    input: &str,
+    ranges: &[(u32, u32)],
+    output_dir: Option<&str>,
+) -> ToolResult<Vec<String>> {
+    let data = std::fs::read(input)?;
+    let parts = super::pdf_split_ranges(&data, ranges)?;
+    write_split_parts(&parts, input, output_dir)
+}
+
+/// 每 N 页拆分 PDF 落盘:返回产物路径列表
+#[cfg(feature = "pdf")]
+pub fn split_pdf_every_n(input: &str, n: u32, output_dir: Option<&str>) -> ToolResult<Vec<String>> {
+    let data = std::fs::read(input)?;
+    let parts = super::pdf_split_every_n(&data, n)?;
+    write_split_parts(&parts, input, output_dir)
+}
+
+/// 按奇偶页拆分 PDF 落盘(单产物,落 `output_dir` 或源文件旁目录),返回产物路径列表
+#[cfg(feature = "pdf")]
+pub fn split_pdf_parity(
+    input: &str,
+    parity: super::Parity,
+    output_dir: Option<&str>,
+) -> ToolResult<Vec<String>> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_split_parity(&data, parity)?;
+    write_split_parts(&[out_data], input, output_dir)
+}
+
+/// 合并多个 PDF 落盘:默认输出第一个文件旁,返回产物路径
+#[cfg(feature = "pdf")]
+pub fn merge_pdfs(paths: &[String], output: Option<&str>) -> ToolResult<String> {
+    if paths.is_empty() {
+        return Err(ToolError::InvalidInput("无输入文件".into()));
+    }
+    let mut docs = Vec::with_capacity(paths.len());
+    for p in paths {
+        docs.push(std::fs::read(p)?);
+    }
+    let merged = super::pdf_merge(&docs)?;
+    write_output(&merged, &paths[0], output, "pdf")
+}
+
+/// 删除 PDF 指定页并落盘(默认源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn delete_pdf_pages(
+    input: &str,
+    page_nums: &[u32],
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_delete_pages(&data, page_nums)?;
+    write_output(&out_data, input, output, "pdf")
+}
+
+/// 提取 PDF 指定页并落盘(默认源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn extract_pdf_pages(
+    input: &str,
+    page_nums: &[u32],
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_extract_pages(&data, page_nums)?;
+    write_output(&out_data, input, output, "pdf")
+}
+
+/// 设置 PDF 元数据并落盘(默认源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn set_pdf_metadata(
+    input: &str,
+    title: Option<&str>,
+    author: Option<&str>,
+    subject: Option<&str>,
+    keywords: Option<&str>,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_set_metadata(&data, title, author, subject, keywords)?;
+    write_output(&out_data, input, output, "pdf")
+}
+
+/// 为 PDF 每页添加页码并落盘(默认源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn add_pdf_page_numbers(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_add_page_numbers(&data)?;
+    write_output(&out_data, input, output, "pdf")
 }
 
 // ---- 字体 IO(font feature)----
@@ -348,12 +453,49 @@ pub fn convert_svg_file(
     write_output(&out_data, input, output, target.ext())
 }
 
+// ---- XLSX IO(xlsx feature)----
+
+/// XLSX → JSON 文件(默认输出源文件旁 .json),返回产物路径
+#[cfg(feature = "xlsx")]
+pub fn xlsx_to_json_file(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let json = super::xlsx_to_json(&data)?;
+    write_output(json.as_bytes(), input, output, "json")
+}
+
+/// JSON → XLSX 文件(默认输出源文件旁 .xlsx),返回产物路径
+#[cfg(feature = "xlsx")]
+pub fn json_to_xlsx_file(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let xlsx = super::json_to_xlsx(&data)?;
+    write_output(&xlsx, input, output, "xlsx")
+}
+
+// ---- 文本提取 IO(pdf/archive feature)----
+
+/// PDF → TXT 文件(默认输出源文件旁 .txt),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn pdf_to_text_file(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let text = super::pdf_to_text(&data)?;
+    write_output(text.as_bytes(), input, output, "txt")
+}
+
+/// DOCX → TXT 文件(默认输出源文件旁 .txt),返回产物路径
+#[cfg(feature = "archive")]
+pub fn docx_to_text_file(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let text = super::docx_to_text(&data)?;
+    write_output(text.as_bytes(), input, output, "txt")
+}
+
 // ---- 引擎 IO ----
 
 /// 引擎转换并落盘(默认输出到源文件旁),返回产物路径
 ///
 /// 引擎直接操作文件路径(非字节域):计算输出路径 → 检查可用性 → 委托执行。
-/// 显式 `output` 用之;否则源文件旁 `{stem}.{output_ext}`(引擎默认覆盖,与字节域碰撞策略不同)。
+/// 显式 `output` 用之;否则源文件旁 `{stem}.{output_ext}`,同扩展名时用
+/// `{stem}_converted.{output_ext}` 避免覆盖源文件。
 pub fn engine_convert_file(
     input: &str,
     engine: Engine,

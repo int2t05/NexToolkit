@@ -256,7 +256,7 @@ pub fn image_compress_jpeg(data: &[u8], quality: u8) -> ToolResult<Vec<u8>> {
     Ok(buf.into_inner())
 }
 
-/// 编码 DynamicImage 到目标格式字节(DDS 不可编码,调用前应经 [`ImageFormat::can_encode`] 拦截)
+/// 编码 DynamicImage 到目标格式字节(DDS 不可编码,内部经 `can_encode` 校验返回 InvalidInput)
 fn encode(img: &image::DynamicImage, target: ImageFormat) -> ToolResult<Vec<u8>> {
     if !target.can_encode() {
         return Err(ToolError::InvalidInput(format!(

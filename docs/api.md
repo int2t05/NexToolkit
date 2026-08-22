@@ -1,9 +1,9 @@
 # 接口契约
 
 > Tauri command 契约:前端经 `@tauri-apps/api/core` 的 `invoke` 调用。无 HTTP API(桌面工具集)。
-> 命令在 `crates/tauri-app/src/commands.rs` 以 `#[tauri::command]` 声明,薄封装 `nextool-core`,共 13 个:
-> 3 通用入口(`list_tools`/`run_tool`/`list_file_tools`)+ 10 文件命令(归档/图像/PDF)。
-> 文本工具(54 个)不再各自独立 command,统一经 `run_tool(id, input, args)` 分发。
+> 命令在 `crates/tauri-app/src/commands.rs` 以 `#[tauri::command]` 声明,薄封装 `nextool-core`,共 38 个:
+> 4 通用入口(`list_tools`/`run_tool`/`list_file_tools`/`list_engines`)+ 34 文件命令(归档 4 / 图像 7 / PDF 12 / 字体 2 / SVG 1 / XLSX 2 / 引擎 6)。
+> 文本工具(107 个)不再各自独立 command,统一经 `run_tool(id, input, args)` 分发。
 > 前端参数以 camelCase 传入(Tauri 默认),Rust 侧 snake_case 接收。
 
 ## 调用方式
@@ -31,7 +31,7 @@ const tools = await invoke<ToolMetaDto[]>('list_tools')
 
 ## 通用入口
 
-文本工具(54 个)统一经 `run_tool` 分发,不再各自独立 command。前端 `onMount` 调 `list_tools()` 拉取 `Vec<ToolMetaDto>` 动态渲染工具列表与参数表单,执行时调 `run_tool`。
+文本工具(107 个)统一经 `run_tool` 分发,不再各自独立 command。前端 `onMount` 调 `list_tools()` 拉取 `Vec<ToolMetaDto>` 动态渲染工具列表与参数表单,执行时调 `run_tool`。
 
 ```ts
 interface ParamSpecDto {
@@ -54,111 +54,28 @@ interface ToolMetaDto {
 }
 ```
 
-- `list_tools()`:返回全部文本工具元数据(54 项),前端按 `group` 分组渲染。
-- `list_file_tools()`:返回 10 个文件工具元数据(与独立 command 对齐),复用同一渲染逻辑。
+- `list_tools()`:返回全部文本工具元数据(107 项),前端按 `group` 分组渲染。
+- `list_file_tools()`:返回 34 个文件工具元数据(与独立 command 对齐),复用同一渲染逻辑。
+- `list_engines()`:返回 6 个引擎的运行时探测状态(`EngineStatusDto`,已装/未装),供前端提示。
 - `run_tool(id, input, args)`:按 `id` 查 registry 分发,`args` 为 `Vec<(String,String)>`(前端传 `[[key,val],...]`)。未知 `id` 返回 `CmdError("未知工具: {id}")`。
 - `output_kind`:前端据此决定渲染——`text` 纯文本;`json`/`sql`/`xml`/`yaml`/`toml`/`css` 经 highlight.js 高亮;`svg` 直接渲染为 SVG。
 
 ## 文本工具 id 清单
 
-下表按 `group` 列出全部 54 个文本工具 id。`主` 列标记是否需要主输入(`input`);`args` 列列出参数 key(类型);`输出` 列为 `output_kind`;错误语义列于备注。参数完整 schema(label/default/options/placeholder)以 `list_tools()` 返回为准。
+文本工具 id、参数 schema、`output_kind`、错误语义**以 `list_tools()` 返回为准**(107 项,分组:`encode` 26 / `convert` 25 / `format` 6 / `generate` 7 / `text` 15 / `crypto` 21 / `nettime` 6 / `http` 1 / `unit` 1)。前端 `onMount` 拉取元数据动态渲染,不维护静态清单,避免文档与代码漂移。
 
-### encode(10)
-
-| id | 主 | args | 输出 | 错误 |
-|---|---|---|---|---|
-| `base64_encode` | ✓ | — | text | — |
-| `base64_decode` | ✓ | — | text | `Base64`/`Utf8` |
-| `url_encode` | ✓ | — | text | — |
-| `url_decode` | ✓ | — | text | `Parse` |
-| `html_encode` | ✓ | — | text | — |
-| `html_decode` | ✓ | — | text | — |
-| `hex_encode` | ✓ | — | text | — |
-| `hex_decode` | ✓ | — | text | `Parse`/`Utf8` |
-| `jwt_decode` | ✓ | — | json | `InvalidInput`(格式)/`Base64`/`Json` |
-| `jwt_verify` | ✓ | `key`(text) | json | `InvalidInput`(格式/alg 不支持/验签失败)/`Other` |
-
-### convert(9)
-
-| id | 主 | args | 输出 | 错误 |
-|---|---|---|---|---|
-| `json_to_yaml` | ✓ | — | yaml | `Json`/`Yaml` |
-| `yaml_to_json` | ✓ | — | json | `Yaml`/`Json` |
-| `json_to_toml` | ✓ | — | toml | `Json`/`InvalidInput`(null)/`Toml` |
-| `toml_to_json` | ✓ | — | json | `Toml`/`Json` |
-| `json_to_csv` | ✓ | — | text | `Json`/`InvalidInput`(非数组/空/非对象)/`Csv` |
-| `csv_to_json` | ✓ | — | json | `Csv`/`Json` |
-| `md_to_html` | ✓ | — | xml | — |
-| `numbase_convert` | ✓ | `from`(number), `to`(number) | text | `InvalidInput`(进制 ∉ 2..36 / 解析失败) |
-| `unit_convert` | ✗ | `value`(number), `from`(text), `to`(text) | text | `InvalidInput`(未知单位/跨类) |
-
-### format(6)
-
-| id | 主 | args | 输出 | 错误 |
-|---|---|---|---|---|
-| `json_format` | ✓ | — | json | `Json` |
-| `json_minify` | ✓ | — | json | `Json` |
-| `sql_format` | ✓ | — | sql | `EmptyInput` |
-| `xml_format` | ✓ | — | xml | `Other`(标签不匹配等) |
-| `xml_minify` | ✓ | — | xml | `Other` |
-| `css_minify` | ✓ | — | css | `Other` |
-
-### generate(7)
-
-| id | 主 | args | 输出 | 错误 |
-|---|---|---|---|---|
-| `uuid_v4` | ✗ | — | text | — |
-| `uuid_v7` | ✗ | — | text | — |
-| `hash` | ✓ | `algo`(select: md5/sha1/sha256/sha512) | text | `Parse`(未知算法) |
-| `hmac_compute` | ✓ | `algo`(select), `key`(text) | text | `Parse`(未知算法) |
-| `password_generate` | ✗ | `length`(number), `upper`/`lower`/`digits`/`symbols`(select: true/false) | text | `InvalidInput`(长度<1) |
-| `lorem_ipsum` | ✗ | `paragraphs`(number) | text | `InvalidInput`(段数为 0) |
-| `qr_svg` | ✓ | — | svg | `EmptyInput`/`Other`(数据过长) |
-
-> `password_generate` 默认规则下沉 core:`PasswordOpts::default()`(大写+小写+数字,不含符号);四项全 `false` 时用默认字符集,CLI/GUI 行为统一。
-
-### text(7)
-
-| id | 主 | args | 输出 | 错误 |
-|---|---|---|---|---|
-| `case_convert` | ✓ | `mode`(select: upper/lower/title/snake/camel/kebab) | text | `Parse`(未知模式) |
-| `sort_lines` | ✓ | — | text | — |
-| `dedup_lines` | ✓ | — | text | — |
-| `reverse_text` | ✓ | — | text | — |
-| `regex_match` | ✓ | `pattern`(text) | text | `Regex`(非法正则) |
-| `regex_replace` | ✓ | `pattern`(text), `replacement`(text) | text | `Regex` |
-| `diff_text` | ✓ | `other`(textarea) | text | — |
-
-### crypto(9)
-
-| id | 主 | args | 输出 | 错误 |
-|---|---|---|---|---|
-| `aes_gcm_encrypt` | ✓ | `password`(password) | text | `Other` |
-| `aes_gcm_decrypt` | ✓ | `password`(password) | text | `Base64`/`InvalidInput`(口令错或数据损坏) |
-| `rsa_keygen` | ✗ | `bits`(number, 默认 2048) | text | `InvalidInput`(<2048)/`Other` |
-| `rsa_encrypt` | ✓ | `pubPem`(textarea) | text | `InvalidInput`(无效 PEM)/`Other` |
-| `rsa_decrypt` | ✓ | `privPem`(textarea) | text | `Base64`/`InvalidInput`/`Other` |
-| `rsa_sign` | ✓ | `privPem`(textarea) | text | `InvalidInput`(无效 PEM)/`Other` |
-| `rsa_verify` | ✓ | `pubPem`(textarea), `signature`(text) | text | `InvalidInput`(无效 PEM/签名/验签失败) |
-| `pbkdf2` | ✓ | `salt`(text), `iterations`(number, 默认 100000) | text | — |
-| `argon2` | ✓ | `salt`(text, ≥8 字节) | text | `InvalidInput`(salt <8 字节)/`Other` |
-
-> `rsa_verify` 成功返回 `"验签成功"`。`rsa_sign`/`rsa_verify` 用 PKCS1v15/SHA256;加解密用 OAEP-SHA256。
-
-### nettime(6)
-
-| id | 主 | args | 输出 | 错误 |
-|---|---|---|---|---|
-| `ipcalc` | ✓ | — | text | `Parse`(非法 CIDR) |
-| `timestamp_to_human` | ✓ | `tz`(text, 默认 UTC) | text | `Parse`(非整数 / 无效时区 / 超范围) |
-| `timestamp_from_human` | ✓ | `tz`(text, 默认 UTC) | text | `Parse`(时间格式 / 时区 / 夏令时歧义) |
-| `cron_next` | ✓ | `count`(number, 默认 3) | text | `InvalidInput`(count=0)/`Parse`(非法 cron) |
-| `dns_lookup` | ✓ | `rtype`(select: A/AAAA/MX/TXT) | text | `InvalidInput`(未知类型)/`Io`/`Other` |
-| `http_probe` | ✗ | `url`(text) | text | `InvalidInput`(URL 非法)/`Other`(请求失败) |
+调用约定:`needs_main_input=true` 的工具主输入经 `input` 参数;`needs_main_input=false` 的生成类工具(`uuid_v4`/`uuid_v7`/`password_generate`/`lorem_ipsum`/`rsa_keygen`/`ed25519_keygen`/`http_probe`/`unit_convert`)无主输入,`input` 传空串。`args` 为 `Vec<(String,String)>`,布尔用 `"true"`/`"false"`,枚举经 strum `FromStr` 解析,非法值返回 `Parse`。`output_kind` 取值:`text` / highlight.js 语言名(`json`/`sql`/`xml`/`yaml`/`toml`/`css`)/ `svg`。
 
 ## 文件转换
 
-字节域独立 command(接收文件路径,后端 `std::fs` 读写,返回路径或路径列表)。`format`/`targetFormat`/`target` 参数为 `String`,Rust 侧经 strum `FromStr` 解析为 `ArchiveFormat`/`ImageFormat` 枚举,非法值返回 `CmdError`。归档格式:`"zip"|"tar"|"targz"|"gz"|"7z"`(7z 仅解压);图像格式:`"png"|"jpg"|"gif"|"bmp"|"webp"|"tiff"|"ico"`。
+字节域独立 command(接收文件路径,后端 `std::fs` 读写,返回路径或路径列表)。`format`/`targetFormat`/`target`/`direction`/`filter`/`parity` 等参数为 `String`,Rust 侧经 strum `FromStr` 解析为对应枚举,非法值返回 `CmdError`。
+
+- **归档格式**(`ArchiveFormat`):`"zip"|"tar"|"targz"|"gz"|"7z"|"bz2"|"xz"|"zst"`(7z/bz2/xz/zst 支持解压,zip/tar/targz/gz/zst 支持压缩)。
+- **图像格式**(`ImageFormat`):`"png"|"jpg"|"gif"|"bmp"|"webp"|"tiff"|"ico"|"dds"|"ff"|"hdr"|"exr"|"pnm"|"qoi"|"tga"`(14 格式,DDS 仅解码)。
+- **字体格式**(`FontFormat`):`"ttf"|"woff"`。
+- **SVG 格式**(`SvgFormat`):`"png"|"jpg"`。
+
+### 归档(4)
 
 | 命令 | 参数 | 返回 | 错误 |
 |---|---|---|---|
@@ -166,14 +83,68 @@ interface ToolMetaDto {
 | `archive_extract` | `path: string`, `outputDir?: string` | 写出文件路径列表(`string[]`) | `Io`/`InvalidInput`(路径遍历/格式) |
 | `archive_compress` | `paths: string[]`, `format: string`, `output?: string` | 产物路径 | `InvalidInput`(未知格式/GZ 多文件)/`Io` |
 | `archive_convert` | `path: string`, `targetFormat: string`, `output?: string` | 产物路径 | `InvalidInput`/`Io` |
-| `image_convert` | `path: string`, `target: string`, `output?: string` | 产物路径 | `InvalidInput`(未知格式/解码失败)/`Other`(编码失败)/`Io` |
-| `image_resize` | `path: string`, `width: u32`, `height: u32`, `output?: string` | 产物路径 | `InvalidInput`(宽高同 0/解码失败)/`Io` |
-| `pdf_split` | `path: string`, `outputDir?: string` | 拆分件路径列表(`string[]`) | `InvalidInput`(格式)/`Io` |
-| `pdf_rotate` | `path: string`, `output?: string` | 产物路径 | `InvalidInput`(格式)/`Other`/`Io` |
-| `pdf_encrypt` | `path: string`, `password: string`, `output?: string` | 产物路径 | `InvalidInput`(空口令/格式)/`Other`/`Io` |
-| `pdf_decrypt` | `path: string`, `password: string`, `output?: string` | 产物路径 | `InvalidInput`(口令错/未加密/格式)/`Io` |
 
-产物默认落源文件所在目录:解压/拆分到 `{stem}_extracted/`,压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`(`create_new` 原子检查,不覆盖)。`output`/`outputDir` 省略时用默认。图像缩放 `width`/`height` 一维为 0 时按另一维等比;产物同源格式。PDF 旋转所有页顺时针 90°;加密用 AES(owner=user 同口令)。
+### 图像(7)
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `image_convert` | `path`, `target: string`, `output?: string` | 产物路径 | `InvalidInput`(未知格式/解码失败)/`Other`(编码失败)/`Io` |
+| `image_resize` | `path`, `width: u32`, `height: u32`, `output?: string` | 产物路径 | `InvalidInput`(宽高同 0/解码失败)/`Io` |
+| `image_crop` | `path`, `x: u32`, `y: u32`, `width: u32`, `height: u32`, `output?: string` | 产物路径 | `InvalidInput`/`Io` |
+| `image_flip` | `path`, `direction: string`(`h`/`v`), `output?: string` | 产物路径 | `InvalidInput`(未知方向)/`Io` |
+| `image_filter` | `path`, `filter: string`(`grayscale`/`invert`/`sepia`/`blur`), `output?: string` | 产物路径 | `InvalidInput`(未知滤镜)/`Io` |
+| `image_adjust` | `path`, `brightness: i32`, `contrast: f32`, `output?: string` | 产物路径 | `Io` |
+| `image_compress_jpeg` | `path`, `quality: u8`, `output?: string` | 产物路径(JPEG) | `InvalidInput`(quality>100)/`Io` |
+
+### PDF(12)
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `pdf_split` | `path`, `outputDir?: string` | 拆分件路径列表(`string[]`) | `InvalidInput`(格式)/`Io` |
+| `pdf_split_ranges` | `path`, `ranges: string`(`"1-3,5,7-10"`), `outputDir?: string` | 拆分件路径列表(`string[]`) | `InvalidInput`(范围/格式)/`Io` |
+| `pdf_split_every_n` | `path`, `n: u32`, `outputDir?: string` | 拆分件路径列表(`string[]`) | `InvalidInput`(n=0/格式)/`Io` |
+| `pdf_split_parity` | `path`, `parity: string`(`odd`/`even`), `outputDir?: string` | 拆分件路径列表(`string[]`) | `InvalidInput`(parity/格式)/`Io` |
+| `pdf_rotate` | `path`, `degrees: u32`(`90`/`180`/`270`), `output?: string` | 产物路径 | `InvalidInput`(格式)/`Other`/`Io` |
+| `pdf_encrypt` | `path`, `password: string`, `output?: string` | 产物路径 | `InvalidInput`(空口令/格式)/`Other`/`Io` |
+| `pdf_decrypt` | `path`, `password: string`, `output?: string` | 产物路径 | `InvalidInput`(口令错/未加密/格式)/`Io` |
+| `pdf_merge` | `paths: string[]`, `output?: string` | 产物路径 | `InvalidInput`(空列表/格式)/`Io` |
+| `pdf_delete_pages` | `path`, `pages: string`(`"1,3,5-7"`), `output?: string` | 产物路径 | `InvalidInput`(页码/格式)/`Io` |
+| `pdf_extract_pages` | `path`, `pages: string`(`"1,3,5-7"`), `output?: string` | 产物路径 | `InvalidInput`(页码/格式)/`Io` |
+| `pdf_set_metadata` | `path`, `title?/author?/subject?/keywords?: string`, `output?: string` | 产物路径 | `InvalidInput`(格式)/`Io` |
+| `pdf_add_page_numbers` | `path`, `output?: string` | 产物路径 | `InvalidInput`(格式)/`Io` |
+
+### 字体(2)
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `font_convert` | `path`, `target: string`(`ttf`/`woff`), `output?: string` | 产物路径 | `InvalidInput`(未知格式/解码失败)/`Io` |
+| `font_meta` | `path: string` | 元数据文本(名称/版权/字重等) | `InvalidInput`(格式)/`Io` |
+
+### SVG(1)
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `svg_convert` | `path`, `target: string`(`png`/`jpg`), `output?: string` | 产物路径(栅格化) | `InvalidInput`(未知格式/SVG 解析失败)/`Io` |
+
+### XLSX(2)
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `xlsx_to_json` | `input: string`, `output?: string` | 产物路径(JSON) | `InvalidInput`(格式)/`Io` |
+| `json_to_xlsx` | `input: string`, `output?: string` | 产物路径(XLSX) | `InvalidInput`(格式)/`Io` |
+
+### 引擎(6,运行时探测系统已装)
+
+| 命令 | 参数 | 返回 | 错误 |
+|---|---|---|---|
+| `av_convert` | `input`, `to: string`, `output?: string` | 产物路径 | `Other`(ffmpeg 未装/失败) |
+| `office_to_pdf` | `input: string` | 产物路径(PDF) | `Other`(LibreOffice 未装/失败) |
+| `ebook_convert` | `input`, `to: string`, `output?: string` | 产物路径 | `Other`(calibre 未装/失败) |
+| `markup_convert` | `input`, `to: string`, `output?: string` | 产物路径 | `Other`(pandoc 未装/失败) |
+| `pdf_compress` | `input: string`, `output?: string` | 产物路径(PDF) | `Other`(ghostscript 未装/失败) |
+| `ocr` | `input: string` | 产物路径(TXT) | `Other`(tesseract 未装/失败) |
+
+产物默认落源文件所在目录:解压/拆分到 `{stem}_extracted/`,压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`(`create_new` 原子检查,不覆盖)。`output`/`outputDir` 省略时用默认。图像缩放 `width`/`height` 一维为 0 时按另一维等比;产物同源格式。PDF 加密用 AES(owner=user 同口令)。引擎命令统一经 `engine_convert_file` 落盘,未装引擎返回明确错误提示安装。
 
 
 

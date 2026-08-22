@@ -2,8 +2,7 @@
 //!
 //! 每个文本工具实现 [`Tool`] trait,元数据(id/名称/分组/参数 schema)与逻辑一体。
 //! [`tools()`] 返回全部注册工具,供 GUI 动态渲染;[`find_tool()`] 按 id 查找供 `run_tool` 分发。
-//! 现有裸函数保留(供 CLI 类型化直接调用),trait impl 是元数据 + 字符串参数适配层。
-//! 仅覆盖 str→str 文本工具;文件工具(字节域/路径)I/O 模型不同,不进此 trait。
+//! 裸函数供 CLI 类型化直接调用;trait impl 提供元数据与字符串参数执行入口。
 
 use crate::{ToolError, ToolResult};
 
@@ -49,7 +48,6 @@ pub enum ParamKind {
     Select,
     Number,
     Password,
-    Bool,
     File,
 }
 
@@ -187,6 +185,14 @@ pub fn tools() -> &'static [&'static dyn Tool] {
         &crate::text::RegexMatch,
         &crate::text::RegexReplace,
         &crate::text::DiffText,
+        &crate::text::TextStats,
+        &crate::text::TextTrimBlank,
+        &crate::text::TabToSpace,
+        &crate::text::SpaceToTab,
+        &crate::text::TextAlign,
+        &crate::text::TextReplace,
+        &crate::text::TextEscape,
+        &crate::text::NumberLines,
         // crypto
         &crate::crypto::AesGcmEncrypt,
         &crate::crypto::AesGcmDecrypt,
@@ -197,6 +203,18 @@ pub fn tools() -> &'static [&'static dyn Tool] {
         &crate::crypto::RsaVerify,
         &crate::crypto::KdfPbkdf2,
         &crate::crypto::KdfArgon2,
+        &crate::crypto::ChaCha20Encrypt,
+        &crate::crypto::ChaCha20Decrypt,
+        &crate::crypto::Ed25519Keygen,
+        &crate::crypto::Ed25519Sign,
+        &crate::crypto::Ed25519Verify,
+        &crate::crypto::BcryptHash,
+        &crate::crypto::BcryptVerify,
+        &crate::crypto::ScryptHash,
+        &crate::crypto::ScryptVerify,
+        &crate::crypto::HmacMulti,
+        &crate::crypto::Crc32,
+        &crate::crypto::Crc64,
         // nettime
         &crate::nettime::Ipcalc,
         &crate::nettime::TimestampToHuman,

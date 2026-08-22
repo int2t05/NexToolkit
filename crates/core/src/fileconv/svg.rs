@@ -3,7 +3,6 @@
 //! 经 `resvg` 解析 SVG → `tiny-skia` 栅格化 → 编码目标格式。PNG 经 tiny-skia 的 `encode_png`
 //! (正确处理 premultiplied alpha 的 demultiply);JPG 经 SVG→PNG→`image` crate 重编码为 JPEG
 //! (JPEG 无 alpha 通道,内部转 RGB)。输入输出为 `&[u8]`/`Vec<u8>`,不碰文件系统。
-//! SVG→PDF(VC-03)需 printpdf,归另一批,暂跳过。
 
 use crate::{ToolError, ToolResult};
 

@@ -1,4 +1,4 @@
-//! 网络/时间子命令:ipcalc/timestamp/cron/dns
+//! 网络/时间子命令:ipcalc/timestamp/cron/dns/http
 
 use clap::{Args, Subcommand};
 

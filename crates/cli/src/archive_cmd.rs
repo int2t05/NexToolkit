@@ -1,4 +1,4 @@
-//! 文件转换子命令:归档解压/压缩/转换/列表 + 图像转换/缩放
+//! 文件转换子命令:归档/图像/PDF/字体/SVG/引擎/电子表格
 //!
 //! 薄封装 [`nextool_core::fileconv`] 的纯内存 API 与 [`nextool_core::fileconv::fs_util`] 的落盘边界。
 //! 产物落源文件所在目录(碰撞处理见 fs_util)。
@@ -45,6 +45,16 @@ enum FileConvCmd {
         #[command(subcommand)]
         cmd: EngineCmd,
     },
+    /// 电子表格:XLSX↔JSON 互转
+    Xlsx {
+        #[command(subcommand)]
+        cmd: XlsxCmd,
+    },
+    /// 文本提取:PDF/DOCX → TXT
+    Extract {
+        #[command(subcommand)]
+        cmd: ExtractCmd,
+    },
 }
 
 #[derive(Subcommand)]
@@ -73,9 +83,15 @@ enum SvgCmd {
 
 #[derive(Subcommand)]
 enum PdfCmd {
-    /// 拆分 PDF:每页一个独立 PDF
+    /// 拆分 PDF:默认每页一个;--ranges/--every-n/--parity 三选一(优先级 ranges > every_n > parity)
     Split {
         input: String,
+        #[arg(long, help = "自定义范围,如 \"1-3,5,7-10\"")]
+        ranges: Option<String>,
+        #[arg(long, help = "每 N 页一段")]
+        every_n: Option<u32>,
+        #[arg(long, help = "奇偶页分离(odd/even)")]
+        parity: Option<nextool_core::Parity>,
         #[arg(long)]
         output_dir: Option<String>,
     },
@@ -100,6 +116,49 @@ enum PdfCmd {
         input: String,
         #[arg(long)]
         password: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 合并多个 PDF(顺序拼接,默认输出第一个文件旁)
+    Merge {
+        #[arg(required = true)]
+        files: Vec<String>,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 删除指定页(--pages 逗号分隔页号,如 \"2,4,6\")
+    DeletePages {
+        input: String,
+        #[arg(long)]
+        pages: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 提取指定页,删除其余(--pages 逗号分隔页号)
+    ExtractPages {
+        input: String,
+        #[arg(long)]
+        pages: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 设置元数据(--title/--author/--subject/--keywords,仅非空字段写入)
+    SetMetadata {
+        input: String,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long)]
+        author: Option<String>,
+        #[arg(long)]
+        subject: Option<String>,
+        #[arg(long)]
+        keywords: Option<String>,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 为每页添加右下角页码(1-based)
+    AddPageNumbers {
+        input: String,
         #[arg(long)]
         output: Option<String>,
     },
@@ -241,6 +300,38 @@ enum EngineCmd {
     Ocr { input: String },
 }
 
+#[derive(Subcommand)]
+enum XlsxCmd {
+    /// XLSX → JSON(首个 sheet 转二维数组)
+    ToJson {
+        input: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// JSON → XLSX(二维数组写首个 sheet)
+    FromJson {
+        input: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum ExtractCmd {
+    /// PDF → TXT(纯文本提取)
+    Pdf {
+        input: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// DOCX → TXT(Word 文档文本提取)
+    Docx {
+        input: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
 pub fn run(args: FileConvArgs) -> Result<(), String> {
     match args.cmd {
         FileConvCmd::Archive { cmd } => match cmd {
@@ -363,9 +454,24 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
             }
         },
         FileConvCmd::Pdf { cmd } => match cmd {
-            PdfCmd::Split { input, output_dir } => {
-                let written = nextool_core::split_pdf(&input, output_dir.as_deref())
-                    .map_err(|e| e.to_string())?;
+            PdfCmd::Split {
+                input,
+                ranges,
+                every_n,
+                parity,
+                output_dir,
+            } => {
+                let written = if let Some(s) = ranges {
+                    let r = nextool_core::parse_page_ranges(&s).map_err(|e| e.to_string())?;
+                    nextool_core::split_pdf_ranges(&input, &r, output_dir.as_deref())
+                } else if let Some(n) = every_n {
+                    nextool_core::split_pdf_every_n(&input, n, output_dir.as_deref())
+                } else if let Some(p) = parity {
+                    nextool_core::split_pdf_parity(&input, p, output_dir.as_deref())
+                } else {
+                    nextool_core::split_pdf(&input, output_dir.as_deref())
+                }
+                .map_err(|e| e.to_string())?;
                 println!("已拆分为 {} 个 PDF", written.len());
                 Ok(())
             }
@@ -397,6 +503,60 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 let out = nextool_core::decrypt_pdf(&input, &password, output.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已解密 {out}");
+                Ok(())
+            }
+            PdfCmd::Merge { files, output } => {
+                let out = nextool_core::merge_pdfs(&files, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已合并 {out}");
+                Ok(())
+            }
+            PdfCmd::DeletePages {
+                input,
+                pages,
+                output,
+            } => {
+                let nums = parse_page_list(&pages)?;
+                let out = nextool_core::delete_pdf_pages(&input, &nums, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已删除页 {out}");
+                Ok(())
+            }
+            PdfCmd::ExtractPages {
+                input,
+                pages,
+                output,
+            } => {
+                let nums = parse_page_list(&pages)?;
+                let out = nextool_core::extract_pdf_pages(&input, &nums, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已提取页 {out}");
+                Ok(())
+            }
+            PdfCmd::SetMetadata {
+                input,
+                title,
+                author,
+                subject,
+                keywords,
+                output,
+            } => {
+                let out = nextool_core::set_pdf_metadata(
+                    &input,
+                    title.as_deref(),
+                    author.as_deref(),
+                    subject.as_deref(),
+                    keywords.as_deref(),
+                    output.as_deref(),
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已设置元数据 {out}");
+                Ok(())
+            }
+            PdfCmd::AddPageNumbers { input, output } => {
+                let out = nextool_core::add_pdf_page_numbers(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已添加页码 {out}");
                 Ok(())
             }
         },
@@ -513,5 +673,44 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 Ok(())
             }
         },
+        FileConvCmd::Xlsx { cmd } => match cmd {
+            XlsxCmd::ToJson { input, output } => {
+                let out = nextool_core::xlsx_to_json_file(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            XlsxCmd::FromJson { input, output } => {
+                let out = nextool_core::json_to_xlsx_file(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Extract { cmd } => match cmd {
+            ExtractCmd::Pdf { input, output } => {
+                let out = nextool_core::pdf_to_text_file(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已提取 {out}");
+                Ok(())
+            }
+            ExtractCmd::Docx { input, output } => {
+                let out = nextool_core::docx_to_text_file(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已提取 {out}");
+                Ok(())
+            }
+        },
     }
+}
+
+/// 解析逗号分隔页号列表 "2,4,6" → Vec<u32>
+fn parse_page_list(s: &str) -> Result<Vec<u32>, String> {
+    s.split(',')
+        .map(|p| {
+            p.trim()
+                .parse::<u32>()
+                .map_err(|e| format!("页号解析失败: {e}"))
+        })
+        .collect()
 }

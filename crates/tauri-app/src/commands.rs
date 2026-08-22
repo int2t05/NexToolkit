@@ -50,7 +50,6 @@ fn param_kind_str(k: ParamKind) -> &'static str {
         ParamKind::Select => "select",
         ParamKind::Number => "number",
         ParamKind::Password => "password",
-        ParamKind::Bool => "bool",
         ParamKind::File => "file",
     }
 }
@@ -135,7 +134,7 @@ pub fn list_engines() -> Vec<EngineStatusDto> {
         .collect()
 }
 
-/// 文件工具静态元数据:与 tools.ts 的 fileconv 段对齐
+/// 文件工具静态元数据(list_file_tools 返回,前端动态渲染)
 ///
 /// output_kind 统一为 Text(产物为路径或路径列表,无需语法高亮);
 /// params 的 key 用 camelCase,经 Tauri 映射到 Rust 命令的 snake_case 形参。
@@ -598,6 +597,311 @@ static FILE_TOOLS: &[ToolMeta] = &[
         output_kind: OutputKind::Text,
     },
     ToolMeta {
+        id: "pdf_split_ranges",
+        name: "PDF 范围拆分",
+        desc: "按范围拆分(如 1-3,5)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "ranges",
+                kind: ParamKind::Text,
+                label: "范围",
+                default: None,
+                options: &[],
+                placeholder: Some("如 1-3,5,7-10"),
+                multiple: false,
+            },
+            ParamSpec {
+                key: "outputDir",
+                kind: ParamKind::Text,
+                label: "输出目录",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_split_every_n",
+        name: "PDF 每 N 页拆分",
+        desc: "每 N 页一段",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "n",
+                kind: ParamKind::Number,
+                label: "每段页数",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "outputDir",
+                kind: ParamKind::Text,
+                label: "输出目录",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_split_parity",
+        name: "PDF 奇偶页拆分",
+        desc: "分离奇/偶页",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "parity",
+                kind: ParamKind::Select,
+                label: "奇偶",
+                default: Some("odd"),
+                options: &["odd", "even"],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "outputDir",
+                kind: ParamKind::Text,
+                label: "输出目录",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_merge",
+        name: "PDF 合并",
+        desc: "多个 PDF 顺序拼接",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "paths",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: true,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认第一个文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_delete_pages",
+        name: "PDF 删除页",
+        desc: "删除指定页",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "pages",
+                kind: ParamKind::Text,
+                label: "页号",
+                default: None,
+                options: &[],
+                placeholder: Some("如 2,4,6"),
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_extract_pages",
+        name: "PDF 提取页",
+        desc: "保留指定页,删其余",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "pages",
+                kind: ParamKind::Text,
+                label: "页号",
+                default: None,
+                options: &[],
+                placeholder: Some("如 1,3,5"),
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_set_metadata",
+        name: "PDF 元数据",
+        desc: "设置标题/作者/主题/关键词",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "title",
+                kind: ParamKind::Text,
+                label: "标题",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "author",
+                kind: ParamKind::Text,
+                label: "作者",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "subject",
+                kind: ParamKind::Text,
+                label: "主题",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "keywords",
+                kind: ParamKind::Text,
+                label: "关键词",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_add_page_numbers",
+        name: "PDF 页码",
+        desc: "每页右下角加页码",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
         id: "font_convert",
         name: "字体转换",
         desc: "TTF/OTF↔WOFF 互转",
@@ -863,9 +1167,99 @@ static FILE_TOOLS: &[ToolMeta] = &[
         needs_main_input: false,
         output_kind: OutputKind::Text,
     },
+    ToolMeta {
+        id: "xlsx_to_json",
+        name: "XLSX 转 JSON",
+        desc: "电子表格转二维数组 JSON",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "XLSX 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁 .json"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "json_to_xlsx",
+        name: "JSON 转 XLSX",
+        desc: "二维数组 JSON 写电子表格",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "JSON 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁 .xlsx"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_to_text",
+        name: "PDF 提取文本",
+        desc: "PDF 转纯文本",
+        group: "fileconv",
+        params: &[ParamSpec {
+            key: "path",
+            kind: ParamKind::File,
+            label: "PDF 文件",
+            default: None,
+            options: &[],
+            placeholder: None,
+            multiple: false,
+        }],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "docx_to_text",
+        name: "DOCX 提取文本",
+        desc: "Word 文档转纯文本",
+        group: "fileconv",
+        params: &[ParamSpec {
+            key: "path",
+            kind: ParamKind::File,
+            label: "DOCX 文件",
+            default: None,
+            options: &[],
+            placeholder: None,
+            multiple: false,
+        }],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
 ];
 
-// 文件转换命令:归档/图像/PDF(接收路径,委托 fileconv 落盘,返回路径或路径列表)
+// 文件转换命令(接收路径,委托 fileconv 落盘,返回路径或路径列表)
 
 /// 列出归档内文件(每行 `路径\t大小`)
 #[tauri::command]
@@ -1046,6 +1440,120 @@ pub fn pdf_decrypt(path: String, password: String, output: Option<String>) -> Cm
     )?)
 }
 
+/// 按范围拆分 PDF(返回产物路径列表)
+#[tauri::command]
+pub fn pdf_split_ranges(
+    path: String,
+    ranges: String,
+    output_dir: Option<String>,
+) -> CmdResult<Vec<String>> {
+    let r = nextool_core::parse_page_ranges(&ranges)?;
+    Ok(nextool_core::split_pdf_ranges(
+        &path,
+        &r,
+        output_dir.as_deref(),
+    )?)
+}
+
+/// 每 N 页拆分 PDF(返回产物路径列表)
+#[tauri::command]
+pub fn pdf_split_every_n(
+    path: String,
+    n: u32,
+    output_dir: Option<String>,
+) -> CmdResult<Vec<String>> {
+    Ok(nextool_core::split_pdf_every_n(
+        &path,
+        n,
+        output_dir.as_deref(),
+    )?)
+}
+
+/// 按奇偶页拆分 PDF(返回产物路径列表,单元素)
+#[tauri::command]
+pub fn pdf_split_parity(
+    path: String,
+    parity: String,
+    output_dir: Option<String>,
+) -> CmdResult<Vec<String>> {
+    let p = parity
+        .parse::<nextool_core::Parity>()
+        .map_err(|e| CmdError(e.to_string()))?;
+    Ok(nextool_core::split_pdf_parity(
+        &path,
+        p,
+        output_dir.as_deref(),
+    )?)
+}
+
+/// 合并多个 PDF(默认输出第一个文件旁);返回产物路径
+#[tauri::command]
+pub fn pdf_merge(paths: Vec<String>, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::merge_pdfs(&paths, output.as_deref())?)
+}
+
+/// 删除 PDF 指定页(返回产物路径)
+#[tauri::command]
+pub fn pdf_delete_pages(path: String, pages: String, output: Option<String>) -> CmdResult<String> {
+    let nums = parse_pages(&pages)?;
+    Ok(nextool_core::delete_pdf_pages(
+        &path,
+        &nums,
+        output.as_deref(),
+    )?)
+}
+
+/// 提取 PDF 指定页(返回产物路径)
+#[tauri::command]
+pub fn pdf_extract_pages(path: String, pages: String, output: Option<String>) -> CmdResult<String> {
+    let nums = parse_pages(&pages)?;
+    Ok(nextool_core::extract_pdf_pages(
+        &path,
+        &nums,
+        output.as_deref(),
+    )?)
+}
+
+/// 设置 PDF 元数据(返回产物路径)
+#[tauri::command]
+pub fn pdf_set_metadata(
+    path: String,
+    title: Option<String>,
+    author: Option<String>,
+    subject: Option<String>,
+    keywords: Option<String>,
+    output: Option<String>,
+) -> CmdResult<String> {
+    Ok(nextool_core::set_pdf_metadata(
+        &path,
+        title.as_deref(),
+        author.as_deref(),
+        subject.as_deref(),
+        keywords.as_deref(),
+        output.as_deref(),
+    )?)
+}
+
+/// 为 PDF 每页添加页码(返回产物路径)
+#[tauri::command]
+pub fn pdf_add_page_numbers(path: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::add_pdf_page_numbers(
+        &path,
+        output.as_deref(),
+    )?)
+}
+
+/// 解析逗号分隔页号列表 "2,4,6" → Vec<u32>
+fn parse_pages(s: &str) -> CmdResult<Vec<u32>> {
+    s.split(',')
+        .map(|p| {
+            p.trim()
+                .parse::<u32>()
+                .map_err(|e| CmdError(format!("页号解析失败: {e}")))
+        })
+        .collect()
+}
+
 /// 字体格式互转(默认输出到源文件旁);返回产物路径
 #[tauri::command]
 pub fn font_convert(path: String, target: String, output: Option<String>) -> CmdResult<String> {
@@ -1148,4 +1656,28 @@ pub fn ocr(input: String) -> CmdResult<String> {
         None,
         &nextool_core::SubprocessRunner,
     )?)
+}
+
+/// XLSX → JSON(首个 sheet 转二维数组,输出源文件旁 .json);返回产物路径
+#[tauri::command]
+pub fn xlsx_to_json(input: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::xlsx_to_json_file(&input, output.as_deref())?)
+}
+
+/// JSON → XLSX(二维数组写首个 sheet,输出源文件旁 .xlsx);返回产物路径
+#[tauri::command]
+pub fn json_to_xlsx(input: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::json_to_xlsx_file(&input, output.as_deref())?)
+}
+
+/// PDF → TXT(纯文本提取,输出源文件旁 .txt);返回产物路径
+#[tauri::command]
+pub fn pdf_to_text(input: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::pdf_to_text_file(&input, output.as_deref())?)
+}
+
+/// DOCX → TXT(Word 文档文本提取,输出源文件旁 .txt);返回产物路径
+#[tauri::command]
+pub fn docx_to_text(input: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::docx_to_text_file(&input, output.as_deref())?)
 }

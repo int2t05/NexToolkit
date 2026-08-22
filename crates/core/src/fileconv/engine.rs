@@ -1,8 +1,8 @@
-//! 引擎层:外部引擎子进程桥接(ffmpeg/LibreOffice/calibre/ghostscript/tesseract)
+//! 引擎层:外部引擎子进程桥接(ffmpeg/LibreOffice/calibre/pandoc/ghostscript/tesseract)
 //!
 //! 纯逻辑部分(引擎枚举、命令构造)可单测;子进程调用经 [`EngineRunner`] port 抽象,
 //! prod 用 [`SubprocessRunner`],测试用桩实现。核心包不捆绑重引擎,运行时探测系统已装,
-//! 首次使用提示安装(见 todo/审计)。
+//! 未装时返回错误提示安装。
 
 use crate::{ToolError, ToolResult};
 use std::process::Command;

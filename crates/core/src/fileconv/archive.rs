@@ -365,10 +365,10 @@ fn zip_create(entries: &[ArchiveEntry]) -> ToolResult<Vec<u8>> {
     Ok(cursor.into_inner())
 }
 
-/// 校验条目路径:拒绝绝对路径(Unix `/`、Windows 盘符)与 `..` 遍历
+/// 校验条目路径:拒绝绝对路径(`/`、`\`)与 Windows 盘符(`C:`)与 `..` 遍历
 fn validate_entry_path(path: &str) -> ToolResult<()> {
     let bytes = path.as_bytes();
-    // Unix 绝对路径(`/`、`\`)或 Windows 盘符(`C:`)
+    // 绝对路径(`/` 或 `\`)或 Windows 盘符(`C:`)
     let is_absolute = path.starts_with('/')
         || path.starts_with('\\')
         || (bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':');
