@@ -1,5 +1,8 @@
 //! 加密模块:AES-GCM/RSA/KDF
 
+mod tools;
+pub use tools::*;
+
 use crate::{ToolError, ToolResult};
 use base64::Engine;
 use rand::rngs::OsRng;

@@ -3,16 +3,22 @@
 //! 输入输出为 `&[u8]`/`Vec<u8>`,不碰文件系统。格式经魔术字节检测自动路由。
 //! 路径安全:拒绝 `..` 遍历与绝对路径,避免 zip-slip 类攻击。
 
-use nextool_core::{ToolError, ToolResult};
+use crate::{ToolError, ToolResult};
 use std::io::{Read, Write};
 
-/// 归档格式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::AsRefStr, strum::EnumString, strum::EnumIter,
+)]
 pub enum ArchiveFormat {
+    #[strum(serialize = "zip")]
     Zip,
+    #[strum(serialize = "tar")]
     Tar,
+    #[strum(serialize = "targz")]
     TarGz,
+    #[strum(serialize = "gz")]
     Gz,
+    #[strum(serialize = "7z")]
     SevenZ,
 }
 
@@ -45,21 +51,40 @@ pub fn detect_archive_format(data: &[u8]) -> ToolResult<ArchiveFormat> {
     ))
 }
 
-/// 列出归档内文件,每行 `路径\t大小(字节)`,纯 gz 单文件路径显示为 `(解压内容)`
-pub fn archive_list(data: &[u8]) -> ToolResult<String> {
-    let (_fmt, entries) = extract_auto(data)?;
-    let lines: Vec<String> = entries
-        .iter()
+/// 归档条目元信息(列出归档内容时的结构化返回)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArchiveListEntry {
+    pub path: String,
+    pub size: usize,
+}
+
+/// 列出归档内文件(结构化:路径 + 字节数);纯 gz 单文件路径为 `(解压内容)`
+pub fn archive_list_entries(data: &[u8]) -> ToolResult<Vec<ArchiveListEntry>> {
+    let entries = extract_auto(data)?.1;
+    Ok(entries
+        .into_iter()
         .map(|e| {
-            let name = if e.path.is_empty() {
-                "(解压内容)"
+            let path = if e.path.is_empty() {
+                "(解压内容)".into()
             } else {
-                &e.path
+                e.path
             };
-            format!("{name}\t{}", e.data.len())
+            ArchiveListEntry {
+                path,
+                size: e.data.len(),
+            }
         })
-        .collect();
-    Ok(lines.join("\n"))
+        .collect())
+}
+
+/// 列出归档内文件,每行 `路径\t大小(字节)`(格式化展示,供 CLI 直接打印)
+pub fn archive_list(data: &[u8]) -> ToolResult<String> {
+    let entries = archive_list_entries(data)?;
+    Ok(entries
+        .iter()
+        .map(|e| format!("{}\t{}", e.path, e.size))
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 /// 解压归档(自动检测格式),返回条目列表;路径安全校验
@@ -205,7 +230,6 @@ fn sevenz_extract(data: &[u8]) -> ToolResult<Vec<ArchiveEntry>> {
     let mut entries = Vec::new();
     reader
         .for_each_entries(|entry, stream| {
-            // 跳过目录与无数据条目
             if entry.is_directory || !entry.has_stream {
                 return Ok(false);
             }
@@ -225,18 +249,19 @@ fn sevenz_extract(data: &[u8]) -> ToolResult<Vec<ArchiveEntry>> {
     Ok(entries)
 }
 
+fn zip_err(e: zip::result::ZipError) -> ToolError {
+    ToolError::Other(e.to_string())
+}
+
 fn zip_extract(data: &[u8]) -> ToolResult<Vec<ArchiveEntry>> {
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(data))
-        .map_err(|e| ToolError::Other(e.to_string()))?;
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(data)).map_err(zip_err)?;
     let mut entries = Vec::new();
     for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .map_err(|e| ToolError::Other(e.to_string()))?;
+        let mut file = archive.by_index(i).map_err(zip_err)?;
         if file.is_dir() {
             continue;
         }
-        // enclosed_name 已对 .. 做净化,返回 None 表示路径不安全
+        // enclosed_name 拒绝 .. 与 Unix 绝对路径;validate_entry_path 补充反斜杠分隔的 .. 与 Windows 盘符
         let path = file
             .enclosed_name()
             .ok_or_else(|| ToolError::InvalidInput(format!("zip 条目路径不安全: {}", file.name())))?
@@ -260,24 +285,21 @@ fn zip_create(entries: &[ArchiveEntry]) -> ToolResult<Vec<u8>> {
         } else {
             entry.path.as_str()
         };
-        zip.start_file(name, opts)
-            .map_err(|e| ToolError::Other(e.to_string()))?;
+        zip.start_file(name, opts).map_err(zip_err)?;
         zip.write_all(&entry.data)?;
     }
-    let cursor = zip.finish().map_err(|e| ToolError::Other(e.to_string()))?;
+    let cursor = zip.finish().map_err(zip_err)?;
     Ok(cursor.into_inner())
 }
 
 /// 校验条目路径:拒绝绝对路径(Unix `/`、Windows 盘符)与 `..` 遍历
 fn validate_entry_path(path: &str) -> ToolResult<()> {
-    if path.starts_with('/') || path.starts_with('\\') {
-        return Err(ToolError::InvalidInput(format!(
-            "归档条目路径为绝对路径: {path}"
-        )));
-    }
-    // Windows 盘符如 C:\
     let bytes = path.as_bytes();
-    if bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' {
+    // Unix 绝对路径(`/`、`\`)或 Windows 盘符(`C:`)
+    let is_absolute = path.starts_with('/')
+        || path.starts_with('\\')
+        || (bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':');
+    if is_absolute {
         return Err(ToolError::InvalidInput(format!(
             "归档条目路径为绝对路径: {path}"
         )));
@@ -344,17 +366,17 @@ mod tests {
         let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
         assert!(paths.contains(&"a.txt"));
         assert!(paths.contains(&"dir/b.txt"));
-        // 验证内容
         for e in &entries {
-            if e.path == "a.txt" {
-                assert_eq!(e.data, b"hello");
+            match e.path.as_str() {
+                "a.txt" => assert_eq!(e.data, b"hello"),
+                "dir/b.txt" => assert_eq!(e.data, b"world"),
+                _ => {}
             }
         }
     }
 
     #[test]
     fn sevenz_create_rejected() {
-        // 7z 创建暂不支持
         let entries = vec![ArchiveEntry {
             path: "x".into(),
             data: b"data".to_vec(),
@@ -425,6 +447,82 @@ mod tests {
         assert!(validate_entry_path("a/b/c.txt").is_ok());
     }
 
+    // ---- extract 路径安全(归档级集成)----
+
+    fn malicious_zip(path: &str) -> Vec<u8> {
+        use zip::write::SimpleFileOptions;
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        zip.start_file(path, SimpleFileOptions::default()).unwrap();
+        zip.write_all(b"x").unwrap();
+        zip.finish().unwrap().into_inner()
+    }
+
+    fn malicious_tar(path: &str) -> Vec<u8> {
+        // tar crate 写入端拒绝含 `..` 的路径;先构造合法 tar,再篡改 name 字段并重算 chksum
+        let mut buf = Vec::new();
+        {
+            let mut builder = tar::Builder::new(&mut buf);
+            let mut header = tar::Header::new_gnu();
+            header.set_size(1);
+            header.set_mode(0o644);
+            header.set_mtime(0);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, "placeholder", &b"x"[..])
+                .unwrap();
+            builder.finish().unwrap();
+        }
+        let name = path.as_bytes();
+        buf[..name.len()].copy_from_slice(name);
+        buf[name.len()..100].fill(0);
+        buf[148..156].fill(b' ');
+        let chksum: u32 = buf[..512].iter().map(|&b| b as u32).sum();
+        let chksum_oct = format!("{:06o}\0 ", chksum);
+        buf[148..156].copy_from_slice(chksum_oct.as_bytes());
+        buf
+    }
+
+    fn malicious_sevenz(path: &str) -> Vec<u8> {
+        use sevenz_rust2::{ArchiveEntry, ArchiveWriter};
+        let mut buf = Vec::new();
+        let mut writer = ArchiveWriter::new(std::io::Cursor::new(&mut buf)).unwrap();
+        let mut e = ArchiveEntry::new_file(path);
+        e.has_stream = true;
+        writer.push_archive_entry(e, Some(b"x".as_slice())).unwrap();
+        writer.finish().unwrap();
+        buf
+    }
+
+    #[test]
+    fn zip_rejects_malicious_paths() {
+        for &evil in &["../evil", "/etc/passwd", "C:\\x"] {
+            assert!(
+                zip_extract(&malicious_zip(evil)).is_err(),
+                "zip 应拒绝: {evil}"
+            );
+        }
+    }
+
+    #[test]
+    fn tar_rejects_malicious_paths() {
+        for &evil in &["../evil", "/etc/passwd", "C:\\x"] {
+            assert!(
+                tar_extract(&malicious_tar(evil)).is_err(),
+                "tar 应拒绝: {evil}"
+            );
+        }
+    }
+
+    #[test]
+    fn sevenz_rejects_malicious_paths() {
+        for &evil in &["../evil", "/etc/passwd", "C:\\x"] {
+            assert!(
+                sevenz_extract(&malicious_sevenz(evil)).is_err(),
+                "7z 应拒绝: {evil}"
+            );
+        }
+    }
+
     // ---- gz ----
 
     #[test]
@@ -458,6 +556,20 @@ mod tests {
         assert_eq!(extracted.len(), 1);
         assert_eq!(extracted[0].data, b"contents");
         assert!(extracted[0].path.is_empty()); // 纯 gz 单文件 path 为空
+    }
+
+    #[test]
+    fn gz_list_shows_decompressed_content() {
+        let gz = archive_create(
+            std::slice::from_ref(&ArchiveEntry {
+                path: "data.bin".into(),
+                data: b"contents".to_vec(),
+            }),
+            ArchiveFormat::Gz,
+        )
+        .unwrap();
+        let list = archive_list(&gz).unwrap();
+        assert!(list.contains("(解压内容)\t8"));
     }
 
     // ---- tar ----
@@ -495,7 +607,6 @@ mod tests {
 
     #[test]
     fn tar_skips_directory_entries() {
-        // 含目录条目的 tar:解压应跳过目录,只返回文件
         let mut buf = Vec::new();
         {
             let mut builder = tar::Builder::new(&mut buf);
@@ -532,7 +643,7 @@ mod tests {
         let targz = archive_create(&entries, ArchiveFormat::TarGz).unwrap();
         // 自动检测:targz 的魔术字节是 Gz
         assert_eq!(detect_archive_format(&targz).unwrap(), ArchiveFormat::Gz);
-        let extracted = archive_extract(&targz).unwrap(); // 自动解 tar.gz
+        let extracted = archive_extract(&targz).unwrap();
         assert_eq!(extracted.len(), 2);
         assert_eq!(extracted[0].data, b"hello");
     }
@@ -592,8 +703,6 @@ mod tests {
     fn zip_extract_invalid() {
         assert!(zip_extract(b"not a zip").is_err());
     }
-
-    // ---- compute_output_path / compute_extract_dir 测试见 path.rs ----
 
     // ---- 统一 API ----
 

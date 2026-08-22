@@ -13,6 +13,9 @@ use hickory_resolver::{
 };
 use ipnet::IpNet;
 
+mod tools;
+pub use tools::*;
+
 use crate::{ToolError, ToolResult};
 
 /// IP 子网计算:解析 CIDR(如 "192.168.1.5/24"),输出地址/网络/广播/掩码/主机范围/主机位/主机数

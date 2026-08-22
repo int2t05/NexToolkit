@@ -1,59 +1,11 @@
 //! 文件转换子命令:归档解压/压缩/转换/列表 + 图像转换/缩放
 //!
-//! 薄封装 [`nextool_fileconv`] 的纯内存 API 与 [`nextool_fileconv::fs_util`] 的落盘边界。
+//! 薄封装 [`nextool_core::fileconv`] 的纯内存 API 与 [`nextool_core::fileconv::fs_util`] 的落盘边界。
 //! 产物落源文件所在目录(碰撞处理见 fs_util)。
 
-use clap::{Args, Subcommand, ValueEnum};
+use clap::{Args, Subcommand};
 
 use crate::io::read_bytes_input;
-
-/// 归档格式(clap 值枚举,与 [`nextool_fileconv::ArchiveFormat`] 对应)
-#[derive(Clone, Debug, ValueEnum)]
-pub enum ArchiveFormatArg {
-    Zip,
-    Tar,
-    Targz,
-    Gz,
-    Sevenz,
-}
-
-impl ArchiveFormatArg {
-    fn to_format(&self) -> nextool_fileconv::ArchiveFormat {
-        match self {
-            ArchiveFormatArg::Zip => nextool_fileconv::ArchiveFormat::Zip,
-            ArchiveFormatArg::Tar => nextool_fileconv::ArchiveFormat::Tar,
-            ArchiveFormatArg::Targz => nextool_fileconv::ArchiveFormat::TarGz,
-            ArchiveFormatArg::Gz => nextool_fileconv::ArchiveFormat::Gz,
-            ArchiveFormatArg::Sevenz => nextool_fileconv::ArchiveFormat::SevenZ,
-        }
-    }
-}
-
-/// 图像格式(clap 值枚举,与 [`nextool_fileconv::ImageFormat`] 对应)
-#[derive(Clone, Debug, ValueEnum)]
-pub enum ImageFormatArg {
-    Png,
-    Jpg,
-    Gif,
-    Bmp,
-    Webp,
-    Tiff,
-    Ico,
-}
-
-impl ImageFormatArg {
-    fn to_format(&self) -> nextool_fileconv::ImageFormat {
-        match self {
-            ImageFormatArg::Png => nextool_fileconv::ImageFormat::Png,
-            ImageFormatArg::Jpg => nextool_fileconv::ImageFormat::Jpeg,
-            ImageFormatArg::Gif => nextool_fileconv::ImageFormat::Gif,
-            ImageFormatArg::Bmp => nextool_fileconv::ImageFormat::Bmp,
-            ImageFormatArg::Webp => nextool_fileconv::ImageFormat::Webp,
-            ImageFormatArg::Tiff => nextool_fileconv::ImageFormat::Tiff,
-            ImageFormatArg::Ico => nextool_fileconv::ImageFormat::Ico,
-        }
-    }
-}
 
 #[derive(Args)]
 pub struct FileConvArgs {
@@ -117,7 +69,7 @@ enum ImageCmd {
     /// 图像格式转换
     Convert {
         input: String,
-        target: ImageFormatArg,
+        target: nextool_core::ImageFormat,
         #[arg(long)]
         output: Option<String>,
     },
@@ -145,7 +97,7 @@ enum ArchiveCmd {
     },
     /// 压缩文件为归档
     Compress {
-        format: ArchiveFormatArg,
+        format: nextool_core::ArchiveFormat,
         #[arg(required = true)]
         files: Vec<String>,
         #[arg(long)]
@@ -154,7 +106,7 @@ enum ArchiveCmd {
     /// 归档格式互转
     Convert {
         input: String,
-        target_format: ArchiveFormatArg,
+        target_format: nextool_core::ArchiveFormat,
         #[arg(long)]
         output: Option<String>,
     },
@@ -165,13 +117,13 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
         FileConvCmd::Archive { cmd } => match cmd {
             ArchiveCmd::List { input } => {
                 let data = read_bytes_input(&input)?;
-                let list = nextool_fileconv::archive_list(&data).map_err(|e| e.to_string())?;
+                let list = nextool_core::archive_list(&data).map_err(|e| e.to_string())?;
                 println!("{list}");
                 Ok(())
             }
             ArchiveCmd::Extract { input, output_dir } => {
                 let (out_dir, written) =
-                    nextool_fileconv::extract_to_dir(&input, output_dir.as_deref())
+                    nextool_core::extract_to_dir(&input, output_dir.as_deref())
                         .map_err(|e| e.to_string())?;
                 println!("已解压 {} 个文件到 {out_dir}", written.len());
                 Ok(())
@@ -181,9 +133,8 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 files,
                 output,
             } => {
-                let out =
-                    nextool_fileconv::compress_files(&files, format.to_format(), output.as_deref())
-                        .map_err(|e| e.to_string())?;
+                let out = nextool_core::compress_files(&files, format, output.as_deref())
+                    .map_err(|e| e.to_string())?;
                 println!("已创建归档 {out}");
                 Ok(())
             }
@@ -192,12 +143,8 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 target_format,
                 output,
             } => {
-                let out = nextool_fileconv::convert_file(
-                    &input,
-                    target_format.to_format(),
-                    output.as_deref(),
-                )
-                .map_err(|e| e.to_string())?;
+                let out = nextool_core::convert_file(&input, target_format, output.as_deref())
+                    .map_err(|e| e.to_string())?;
                 println!("已转换 {out}");
                 Ok(())
             }
@@ -208,12 +155,8 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 target,
                 output,
             } => {
-                let out = nextool_fileconv::convert_image_file(
-                    &input,
-                    target.to_format(),
-                    output.as_deref(),
-                )
-                .map_err(|e| e.to_string())?;
+                let out = nextool_core::convert_image_file(&input, target, output.as_deref())
+                    .map_err(|e| e.to_string())?;
                 println!("已转换 {out}");
                 Ok(())
             }
@@ -223,22 +166,21 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 height,
                 output,
             } => {
-                let out =
-                    nextool_fileconv::resize_image_file(&input, width, height, output.as_deref())
-                        .map_err(|e| e.to_string())?;
+                let out = nextool_core::resize_image_file(&input, width, height, output.as_deref())
+                    .map_err(|e| e.to_string())?;
                 println!("已缩放 {out}");
                 Ok(())
             }
         },
         FileConvCmd::Pdf { cmd } => match cmd {
             PdfCmd::Split { input, output_dir } => {
-                let written = nextool_fileconv::split_pdf(&input, output_dir.as_deref())
+                let written = nextool_core::split_pdf(&input, output_dir.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已拆分为 {} 个 PDF", written.len());
                 Ok(())
             }
             PdfCmd::Rotate { input, output } => {
-                let out = nextool_fileconv::rotate_pdf(&input, output.as_deref())
+                let out = nextool_core::rotate_pdf(&input, output.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已旋转 {out}");
                 Ok(())
@@ -248,7 +190,7 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 password,
                 output,
             } => {
-                let out = nextool_fileconv::encrypt_pdf(&input, &password, output.as_deref())
+                let out = nextool_core::encrypt_pdf(&input, &password, output.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已加密 {out}");
                 Ok(())
@@ -258,7 +200,7 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 password,
                 output,
             } => {
-                let out = nextool_fileconv::decrypt_pdf(&input, &password, output.as_deref())
+                let out = nextool_core::decrypt_pdf(&input, &password, output.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已解密 {out}");
                 Ok(())

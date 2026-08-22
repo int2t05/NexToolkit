@@ -1,32 +1,33 @@
-//! 格式转换模块:JSON/YAML/TOML/CSV/Markdown/进制
+//! 格式转换模块:JSON/YAML/TOML 经 IR 互转 + CSV/Markdown/进制
+//!
+//! [`ir`] 为树形格式 IR(DocFormat),[`tools`] 为工具注册;本文件为公开转换函数。
+
+mod ir;
+mod tools;
+
+pub use ir::*;
+pub use tools::*;
 
 use crate::{ToolError, ToolResult};
 
-/// JSON → YAML:经 serde_json::Value 中转,serde_yaml 序列化输出
+/// JSON → YAML
 pub fn json_to_yaml(s: &str) -> ToolResult<String> {
-    let value: serde_json::Value = serde_json::from_str(s)?;
-    serde_yaml::to_string(&value).map_err(|e| ToolError::Other(e.to_string()))
+    convert_format(&Json, &Yaml, s)
 }
 
-/// YAML → JSON(pretty):serde_yaml 解析为 serde_json::Value,美化输出
+/// YAML → JSON(pretty)
 pub fn yaml_to_json(s: &str) -> ToolResult<String> {
-    let value: serde_json::Value =
-        serde_yaml::from_str(s).map_err(|e| ToolError::Other(e.to_string()))?;
-    Ok(serde_json::to_string_pretty(&value)?)
+    convert_format(&Yaml, &Json, s)
 }
 
-/// JSON → TOML:serde_json::Value 转 toml::Value 再 to_string;TOML 不支持 null,遇到报错
+/// JSON → TOML(TOML 不支持 null,遇到报错)
 pub fn json_to_toml(s: &str) -> ToolResult<String> {
-    let value: serde_json::Value = serde_json::from_str(s)?;
-    check_no_null(&value)?;
-    let toml_value = toml::Value::try_from(value).map_err(|e| ToolError::Other(e.to_string()))?;
-    toml::to_string(&toml_value).map_err(|e| ToolError::Other(e.to_string()))
+    convert_format(&Json, &Toml, s)
 }
 
-/// TOML → JSON(pretty):toml::from_str 解析,serde_json 美化输出
+/// TOML → JSON(pretty)
 pub fn toml_to_json(s: &str) -> ToolResult<String> {
-    let value: toml::Value = toml::from_str(s).map_err(|e| ToolError::Other(e.to_string()))?;
-    Ok(serde_json::to_string_pretty(&value)?)
+    convert_format(&Toml, &Json, s)
 }
 
 /// JSON 数组(对象列表)→ CSV:首行表头取第一个对象的 key,后续每行对应一个对象
@@ -46,8 +47,7 @@ pub fn json_to_csv(s: &str) -> ToolResult<String> {
         _ => return Err(ToolError::InvalidInput("数组元素必须为对象".into())),
     };
     let mut wtr = csv::Writer::from_writer(Vec::new());
-    wtr.write_record(&headers)
-        .map_err(|e| ToolError::Other(e.to_string()))?;
+    wtr.write_record(&headers)?;
     for item in &arr {
         let obj = match item {
             serde_json::Value::Object(o) => o,
@@ -57,8 +57,7 @@ pub fn json_to_csv(s: &str) -> ToolResult<String> {
             .iter()
             .map(|h| obj.get(h).map(json_value_to_csv_cell).unwrap_or_default())
             .collect();
-        wtr.write_record(&row)
-            .map_err(|e| ToolError::Other(e.to_string()))?;
+        wtr.write_record(&row)?;
     }
     let bytes = wtr
         .into_inner()
@@ -69,13 +68,10 @@ pub fn json_to_csv(s: &str) -> ToolResult<String> {
 /// CSV → JSON 数组(pretty):首行为表头,后续每行映射为对象(值均为字符串)
 pub fn csv_to_json(s: &str) -> ToolResult<String> {
     let mut reader = csv::Reader::from_reader(s.as_bytes());
-    let headers = reader
-        .headers()
-        .map_err(|e| ToolError::Other(e.to_string()))?
-        .clone();
+    let headers = reader.headers()?.clone();
     let mut arr = Vec::new();
     for result in reader.records() {
-        let record = result.map_err(|e| ToolError::Other(e.to_string()))?;
+        let record = result?;
         let mut obj = serde_json::Map::new();
         for (i, header) in headers.iter().enumerate() {
             let val = record.get(i).unwrap_or("").to_string();
@@ -109,26 +105,6 @@ pub fn numbase_convert(s: &str, from: u32, to: u32) -> ToolResult<String> {
     let n: u128 = u128::from_str_radix(s, from)
         .map_err(|e| ToolError::InvalidInput(format!("进制解析失败({from} 进制):{e}")))?;
     Ok(to_base(n, to))
-}
-
-/// 递归检查 JSON 值中是否含 null;TOML 不支持 null,遇到返回 InvalidInput
-fn check_no_null(v: &serde_json::Value) -> ToolResult<()> {
-    match v {
-        serde_json::Value::Null => Err(ToolError::InvalidInput("TOML 不支持 null 值".into())),
-        serde_json::Value::Array(arr) => {
-            for item in arr {
-                check_no_null(item)?;
-            }
-            Ok(())
-        }
-        serde_json::Value::Object(obj) => {
-            for (_, val) in obj {
-                check_no_null(val)?;
-            }
-            Ok(())
-        }
-        _ => Ok(()),
-    }
 }
 
 /// JSON 值转 CSV 单元格:字符串取原值,null 为空串,其余取 to_string

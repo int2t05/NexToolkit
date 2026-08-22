@@ -1,10 +1,10 @@
 # NexToolkit 工作空间:core(纯逻辑)+ cli(clap)+ tauri-app(GUI)
 [workspace]
-members = ["crates/core", "crates/cli", "crates/tauri-app", "crates/fileconv"]
+members = ["crates/core", "crates/cli", "crates/tauri-app"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 authors = ["int2t05"]

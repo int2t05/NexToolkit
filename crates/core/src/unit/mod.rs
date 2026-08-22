@@ -3,6 +3,9 @@
 //! 支持 FreeConvert 10 类常用单位:长度/面积/体积/质量/温度/时间/速度/数据/能量/频率。
 //! 每类定义基准单位与换算系数(温度为非线性,单独处理)。
 
+mod tools;
+pub use tools::*;
+
 use crate::{ToolError, ToolResult};
 
 /// 单位分类

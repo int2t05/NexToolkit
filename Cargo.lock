@@ -2738,21 +2738,20 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nextool-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "assert_cmd",
  "clap",
  "image",
  "lopdf",
  "nextool-core",
- "nextool-fileconv",
  "predicates",
  "tempfile",
 ]
 
 [[package]]
 name = "nextool-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -2761,11 +2760,14 @@ dependencies = [
  "chrono-tz",
  "cron",
  "csv",
+ "flate2",
  "hex",
  "hickory-resolver",
  "hmac",
  "html-escape",
+ "image",
  "ipnet",
+ "lopdf",
  "md-5 0.10.6",
  "minifier",
  "pbkdf2",
@@ -2778,36 +2780,26 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sevenz-rust2",
  "sha1",
  "sha2 0.10.9",
  "similar",
  "sqlformat",
+ "strum",
+ "tar",
  "thiserror 1.0.69",
  "toml 0.8.23",
  "ureq",
  "urlencoding",
  "uuid",
-]
-
-[[package]]
-name = "nextool-fileconv"
-version = "0.2.0"
-dependencies = [
- "flate2",
- "image",
- "lopdf",
- "nextool-core",
- "sevenz-rust2",
- "tar",
  "zip",
 ]
 
 [[package]]
 name = "nextool-gui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "nextool-core",
- "nextool-fileconv",
  "serde",
  "serde_json",
  "tauri",
@@ -4390,6 +4382,28 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
+name = "strum"
+version = "0.26.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
+dependencies = [
+ "strum_macros",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.26.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.119",
+]
 
 [[package]]
 name = "subtle"

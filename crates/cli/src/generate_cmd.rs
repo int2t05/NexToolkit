@@ -15,12 +15,12 @@ pub struct GenerateArgs {
 enum GenerateCmd {
     /// 计算哈希:md5/sha1/sha256/sha512
     Hash {
-        algo: HashAlgoArg,
+        algo: HashAlgo,
         input: Option<String>,
     },
     /// 生成 HMAC:--key 指定密钥
     Hmac {
-        algo: HashAlgoArg,
+        algo: HashAlgo,
         #[arg(long)]
         key: String,
         input: Option<String>,
@@ -48,39 +48,20 @@ enum GenerateCmd {
     Qr { input: Option<String> },
 }
 
-#[derive(Clone, Copy, clap::ValueEnum)]
-enum HashAlgoArg {
-    Md5,
-    Sha1,
-    Sha256,
-    Sha512,
-}
-
-impl From<HashAlgoArg> for HashAlgo {
-    fn from(a: HashAlgoArg) -> Self {
-        match a {
-            HashAlgoArg::Md5 => HashAlgo::Md5,
-            HashAlgoArg::Sha1 => HashAlgo::Sha1,
-            HashAlgoArg::Sha256 => HashAlgo::Sha256,
-            HashAlgoArg::Sha512 => HashAlgo::Sha512,
-        }
-    }
-}
-
 pub fn run(args: GenerateArgs) -> Result<(), String> {
     match args.cmd {
         GenerateCmd::Hash { algo, input } => {
             let input = read_input(input)?;
             println!(
                 "{}",
-                nextool_core::hash(&input, algo.into()).map_err(|e| e.to_string())?
+                nextool_core::hash(&input, algo).map_err(|e| e.to_string())?
             );
         }
         GenerateCmd::Hmac { algo, key, input } => {
             let input = read_input(input)?;
             println!(
                 "{}",
-                nextool_core::hmac_compute(&input, &key, algo.into()).map_err(|e| e.to_string())?
+                nextool_core::hmac_compute(&input, &key, algo).map_err(|e| e.to_string())?
             );
         }
         GenerateCmd::UuidV4 => {
@@ -96,11 +77,11 @@ pub fn run(args: GenerateArgs) -> Result<(), String> {
             digits,
             symbols,
         } => {
-            // 未指定任何字符集时默认全开
+            // core 内化默认:全 false 时自动用字母数字
             let opts = nextool_core::PasswordOpts {
-                upper: upper || (!upper && !lower && !digits && !symbols),
-                lower: lower || (!upper && !lower && !digits && !symbols),
-                digits: digits || (!upper && !lower && !digits && !symbols),
+                upper,
+                lower,
+                digits,
                 symbols,
             };
             println!(

@@ -2,11 +2,14 @@
 //!
 //! 发起 HEAD/GET 请求,返回状态码、最终 URL(重定向后)、关键响应头。
 
+mod tools;
+pub use tools::*;
+
 use crate::{ToolError, ToolResult};
 
 /// HTTP 探测结果
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HttpProbe {
+pub struct HttpProbeResult {
     /// 最终状态码(重定向后)
     pub status: u16,
     /// 最终 URL(经历重定向后的落地 URL)
@@ -19,7 +22,7 @@ pub struct HttpProbe {
     pub server: String,
 }
 
-impl HttpProbe {
+impl HttpProbeResult {
     /// 格式化为多行文本供 CLI/GUI 展示
     pub fn to_display(&self) -> String {
         format!(
@@ -32,7 +35,7 @@ impl HttpProbe {
 /// 探测 URL:发起 HEAD 请求(跟随重定向),返回状态码与关键响应头
 ///
 /// URL 须含 scheme(http/https),非法格式或连接失败返回 Err。
-pub fn http_probe(url: &str) -> ToolResult<HttpProbe> {
+pub fn http_probe(url: &str) -> ToolResult<HttpProbeResult> {
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return Err(ToolError::InvalidInput(
             "URL 须以 http:// 或 https:// 开头".into(),
@@ -46,7 +49,7 @@ pub fn http_probe(url: &str) -> ToolResult<HttpProbe> {
     let content_type = header_string(&resp, "content-type");
     let content_length = header_string(&resp, "content-length");
     let server = header_string(&resp, "server");
-    Ok(HttpProbe {
+    Ok(HttpProbeResult {
         status,
         final_url,
         content_type,
@@ -91,7 +94,7 @@ mod tests {
 
     #[test]
     fn display_format() {
-        let probe = HttpProbe {
+        let probe = HttpProbeResult {
             status: 200,
             final_url: "https://example.com".into(),
             content_type: "text/html".into(),

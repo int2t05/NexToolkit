@@ -1,5 +1,8 @@
 //! 编解码模块:Base64/URL/HTML/Hex/JWT 等
 
+mod tools;
+pub use tools::*;
+
 use crate::{ToolError, ToolResult};
 
 /// Base64 标准编码(含 padding)

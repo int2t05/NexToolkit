@@ -11,8 +11,8 @@
 ```bash
 git checkout -b feat/<功能>
 npm install
-cargo test -p nextool-core -p nextool-cli -p nextool-fileconv   # 测试必须全绿(真实数据,无 mock)
-cargo clippy -p nextool-core -p nextool-cli -p nextool-fileconv --all-targets -- -D warnings
+cargo test -p nextool-core -p nextool-cli   # 测试必须全绿(真实数据,无 mock)
+cargo clippy -p nextool-core -p nextool-cli --all-targets -- -D warnings
 cargo fmt --check --all
 npm run check                   # 前端类型检查
 ```
@@ -27,7 +27,7 @@ npm run check                   # 前端类型检查
 
 ## 新增工具
 
-1. 文本域:`crates/core/src/<域>.rs` 实现纯逻辑函数 + 单测;`lib.rs` 加 `pub use <域>::*;`。字节域(文件转换):`crates/fileconv/src/<域>.rs`,纯内存逻辑 + 单测,`lib.rs` 加 `pub mod`。
+1. 文本域:`crates/core/src/<域>.rs` 实现纯逻辑函数 + 单测;`lib.rs` 加 `pub use <域>::*;`。字节域(文件转换):`crates/core/src/fileconv/<域>.rs`,纯内存逻辑 + 单测,`fileconv/mod.rs` 加 `pub mod`。
 2. `crates/cli/src/<域>_cmd.rs` 加子命令;`main.rs` 注册。
 3. `crates/tauri-app/src/commands.rs` 加 `#[tauri::command]`;`lib.rs` 的 `use` 与 `generate_handler!` 注册。
 4. `src/tools.ts` 加工具元数据(分组/参数 schema)。

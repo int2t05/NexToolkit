@@ -17,16 +17,12 @@
 
 ```mermaid
 flowchart TD
-  CORE["crates/core<br/>nextool-core: 纯逻辑(文本域)"]
-  FC["crates/fileconv<br/>nextool-fileconv: 文件转换(字节域)"]
+  CORE["crates/core<br/>nextool-core: 统一工具层(文本域 + 字节域)"]
   CLI["crates/cli<br/>nextool-cli: clap bin"]
   GUI["crates/tauri-app<br/>nextool-gui: Tauri command"]
   FE["src/<br/>Svelte 5 前端"]
-  CORE --> FC
   CORE --> CLI
-  FC --> CLI
   CORE --> GUI
-  FC --> GUI
   GUI <-->|"invoke / event"| FE
 ```
 
@@ -34,35 +30,35 @@ flowchart TD
 NexToolkit/
 ├── Cargo.toml                # workspace + 共享 release profile
 ├── crates/
-│   ├── core/                 # 纯逻辑(文本域 &str→String):按域分模块,可独立单测
-│   ├── fileconv/             # 文件转换(字节域 &[u8]→Vec[u8]):archive 纯内存 + fs_util IO 边界
-│   ├── cli/                  # clap 子命令,调 core+fileconv;tests/cli_smoke.rs 集成测试
+│   ├── core/                 # 统一工具层:文本域(&str→String)+ 字节域(&[u8]→Vec[u8]),按种类子文件夹(mod.rs 逻辑 + tools.rs 注册)+ registry 聚合 54 文本工具,可独立单测
+│   │   └── src/fileconv/     # 文件转换(字节域):archive/image/pdf 纯内存 + engine 子进程 trait port + fs_util IO 边界
+│   ├── cli/                  # clap 子命令,调 core;tests/cli_smoke.rs 集成测试
 │   └── tauri-app/            # Tauri command 薄封装 + tauri.conf.json + capabilities
 ├── src/                      # Svelte 5 前端
-├── docs/                     # prd / tech / todo / api / flow + audit
+├── docs/                     # prd / tech / todo / api / flow
 ├── reference/                # 竞品源码(git 忽略,本地分析)
 └── .github/workflows/        # ci.yml + release.yml(三平台)
 ```
 
 ## 双域架构
 
-core 为文本域(`&str→String`,47 函数),fileconv 为字节域(`&[u8]→Vec<u8>`)。归档/图像是二进制数据,强制 String 会引入 base64 开销与 UTF-8 错误风险,故字节域独立 crate。fileconv 复用 core 的 `ToolError`(单一错误定义,无新变体),分模块:
+core 统一承载文本域(`&str→String`)与字节域(`&[u8]→Vec<u8>`)。归档/图像是二进制数据,强制 String 会引入 base64 开销与 UTF-8 错误风险,故字节域独立子模块 `fileconv/`(非独立 crate)。字节域复用 core 根的 `ToolError`(单一错误定义,无新变体),分模块:
 
 - `archive` 模块:归档纯内存逻辑(解压/压缩/互转/检测/路径安全,含 7z 解压),feature gate。
 - `image` 模块:图像纯内存逻辑(格式互转/缩放/检测),feature gate;仅启用常用栅格格式(png/jpeg/gif/bmp/webp/tiff/ico)控制体积。
 - `pdf` 模块:PDF 纯内存逻辑(拆分/旋转/加密/解密/加密检测),feature gate;lopdf default-features=false 去重依赖。
-- `engine` 模块:外部引擎子进程桥接(ffmpeg/LibreOffice/calibre/ghostscript/tesseract),运行时探测 + 命令构造,无 feature gate。
+- `engine` 模块:外部引擎子进程桥接(ffmpeg/LibreOffice/calibre/ghostscript/tesseract),`EngineRunner` trait port + `SubprocessRunner`(prod)+ `FakeRunner`(test,可 mock),运行时探测 + 命令构造,无 feature gate。
 - `path` 模块:纯字符串路径计算(产物路径 + 碰撞后缀),无 feature gate,各域复用。
-- `fs_util` 模块:IO 边界,组合各域纯逻辑 + `std::fs` 落盘(产物落源目录 + `create_new` 碰撞处理),函数级 feature gate,供 CLI/GUI 共享,避免边界逻辑重复。
+- `fs_util` 模块:IO 边界,组合各域纯逻辑 + `std::fs` 落盘;`write_output`/`retry_unique` 抽取消重复,补 `list_archive_file`/`is_pdf_encrypted_file`/`engine_convert_file`,函数级 feature gate,供 CLI/GUI 共享。
 
-core 新增纯 Rust 域:`http`(URL 探测,ureq/rustls)、`unit`(单位换算 10 类,纯数学);crypto 加 rsa_sign/rsa_verify;encode 加 jwt_verify。
+core 另含纯 Rust 域:`http`(URL 探测,ureq/rustls)、`unit`(单位换算 10 类,纯数学);crypto 加 rsa_sign/rsa_verify;encode 加 jwt_verify。
 
 ## 模块设计
 
-core 按域分模块(encode/convert/format/generate/text/crypto/nettime),每个工具为模块内自由函数,输入输出为普通 Rust 类型,错误统一为 `ToolError`。CLI 与 GUI 调同一函数,行为一致。
+core 按种类分子文件夹(encode/text/convert/format/generate/crypto/nettime/unit/http + fileconv 子模块)。文本域种类为文件夹 `{module}/{mod.rs, tools.rs}`:`mod.rs` 裸函数逻辑 + `#[cfg(test)]` 测试,`tools.rs` struct + `impl Tool` 注册(供 registry 聚合);convert 额外有 `ir.rs`(DocFormat IR)。fileconv 子模块为单文件(archive/image/pdf/engine/fs_util/path)。输入输出为普通 Rust 类型,错误统一为 `ToolError`。CLI 与 GUI 调同一函数,行为一致。
 
 ```rust
-//! nextool-core:编解码模块
+//! nextool-core:编解码模块(mod.rs)
 
 /// Base64 标准编码
 pub fn base64_encode(input: &str) -> ToolResult<String> { ... }
@@ -71,7 +67,27 @@ pub fn base64_encode(input: &str) -> ToolResult<String> { ... }
 pub fn base64_decode(input: &str) -> ToolResult<String> { ... }
 ```
 
-未采用统一 `Tool` trait:工具输入异构(文本/字节/双输入/多参数),强制 trait 不挣其复杂度,自由函数 + 统一错误更简洁。设计参考 CyberChef `Operation`(`reference/competitors/CyberChef/src/core/operations/`)与 DevToys 同工具双接口(`reference/competitors/DevToys/src/app/dev/DevToys.Api/`),实现时简化。
+```rust
+//! encode/tools.rs:元数据 + 字符串参数适配,供 registry 聚合
+pub struct Base64Encode;
+impl Tool for Base64Encode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta { id: "base64_encode", name: "Base64 编码", ... };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> ToolResult<String> { base64_encode(input) }
+}
+```
+
+文本工具采用统一 `Tool` trait(元数据 + 字符串参数执行一体),54 个文本工具经 `registry::tools()` 自描述供 GUI 动态渲染;文件工具(字节域/路径)I/O 模型不同不进此 trait,保留各自类型化命令。设计参考 CyberChef `Operation`(`reference/competitors/CyberChef/src/core/operations/`)与 DevToys 同工具双接口(`reference/competitors/DevToys/src/app/dev/DevToys.Api/`),实现时简化。
+
+## 工具注册表
+
+`registry.rs` 定义 `Tool` trait(`meta()` 返回静态元数据 + `run()` 字符串参数执行)与配套类型:`ToolMeta`(id/名称/分组/参数 schema/needs_main_input/output_kind)、`ParamSpec`/`ParamKind`(UI 渲染 + 字符串解析)、`OutputKind`(Text/Highlight/Svg)、`ToolArgs`(类型强转 helper,消除每工具手写 parse)。`tools()` 返回全部 54 个注册工具,`find_tool()` 按 id 查找供 `run_tool` 分发。
+
+枚举加 strum 派生(`AsRefStr`/`EnumString`/`EnumIter`):`HashAlgo`/`CaseMode`/`ArchiveFormat`/`ImageFormat`。CLI 删 `*Arg` 适配器直接用 core 枚举(clap 经 `EnumString` 解析);GUI 删 `parse_*`,前端传字符串由 `ToolArgs` 转换。
+
+GUI 经 `list_tools` 命令拉取元数据列表动态渲染参数表单,`run_tool(id, input, args)` 通用分发——新增文本工具只追加一个 `impl Tool`,无需改前端或加命令。`ToolError` 扩展至 12 变体(原 Utf8/Base64/Json/Io/EmptyInput/InvalidInput/Parse/Other + 新增 Yaml/Toml/Csv/Regex)。`PasswordOpts::default()`(upper/lower/digits=true, symbols=false)下沉 core,CLI/GUI 共用。
 
 ## 三类分发(便携度递减)
 
@@ -89,18 +105,19 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  NAV["左侧七组导航 + 搜索"] --> PANEL["工具面板"]
-  PANEL --> FORM["参数表单(声明式 schema)"]
+  NAV["左侧导航 + 搜索"] --> PANEL["工具面板"]
+  PANEL -->|"list_tools 拉元数据"| FORM["参数表单(动态渲染)"]
   PANEL --> IN["主输入 textarea / stdin"]
   FORM --> RUN["运行"]
   IN --> RUN
-  RUN -->|"invoke(cmd, args)"| BIND["bindings.ts<br/>@tauri-apps/api/core"]
-  BIND --> GUI["commands.rs<br/>#[tauri::command]"]
-  GUI --> CORE["nextool-core"]
+  RUN -->|"invoke(run_tool, id+args)"| BIND["bindings.ts<br/>@tauri-apps/api/core"]
+  BIND --> GUI["commands.rs<br/>run_tool 分发"]
+  GUI -->|"find_tool(id)"| REG["registry.rs"]
+  REG --> CORE["nextool-core 裸函数"]
   CORE --> OUT["输出区 + 复制"]
 ```
 
-- `tools.ts`:声明式工具元数据(分组/参数 schema/needsMainInput)驱动 UI 渲染,新增工具只追加一项。
+- `list_tools` 动态渲染:前端经 `list_tools` 命令拉取 registry 元数据(分组/参数 schema/needs_main_input/output_kind)渲染参数表单,新增文本工具只追加一个 `impl Tool`,无需改前端。
 - `bindings.ts`:用官方 `@tauri-apps/api/core` invoke(非手写内部访问)。
 - 暗色主题、中英双语切换、qr 输出 SVG 内联渲染。
 - 参考 it-tools(Vue3 工具集,布局/复制交互/i18n)+ tauri2-svelte5-shadcn(runes + invoke 封装)+ OpenCovibe(集中式 API)+ comine(capabilities scope)。
@@ -124,20 +141,20 @@ npm run check                         # svelte-check
 
 ## 测试
 
-准则:真实调用、真实数据,禁止 mock。优先用最高 seam(纯逻辑单测),全仓 seam 最少。
+准则:真实调用、真实数据,禁止 mock。优先用最高 seam(纯逻辑单测),全仓 seam 最少——仅 `EngineRunner` trait port 一处用 `FakeRunner` 测试桩(测试中无法真起 ffmpeg/LibreOffice)。
 
-- core 单测(`crates/core/src/*.rs` `#[cfg(test)]`):每工具 ≥3 用例(正常/边界/错误)。
+- core 单测(各模块 `mod.rs` 内 `#[cfg(test)]`):每工具 ≥3 用例(正常/边界/错误)。
 - CLI 集成测试(`crates/cli/tests/cli_smoke.rs`):`assert_cmd` 真起二进制,覆盖路由/stdin/退出码。
 - GUI:由 CI tauri-build 三平台编译验证(本机内存受限无法编译 Tauri 全依赖图)。
 
 ## 避坑
 
 1. **不手写 crypto**:PBKDF2/AES-GCM/RSA/Argon2/HMAC/Hash 全用成熟 crate。
-2. **commands.rs 单文件注释分段**:47 个薄 command 样板,Tauri 必需;规模可控不拆。
+2. **commands.rs 13 个命令**:10 文件命令(archive 4 + image 2 + pdf 4,签名各异独立注册)+ 3 通用命令(list_tools/run_tool/list_file_tools),文本工具经 `run_tool` 通用分发不再逐个注册。
 3. **Capabilities 最小权限**:仅 `core:default` + `windows: ["main"]`,CSP 锁紧(`script-src 'self'`)。
 4. **Windows WebView2**:`skip` + 文档说明;不嵌 runtime。
 5. **体积优化**:release profile `lto`/`opt-level="z"`/`codegen-units=1`/`panic="abort"`/`strip`;前端 Svelte。
-6. **fileconv feature gate**:`archive` feature(默认开)条件依赖 `zip`/`tar`/`flate2`;`fs_util` 同 gate(依赖 archive 函数)。纯内存核心可禁用归档独立使用。
+6. **fileconv feature gate**:core 的 `archive` feature(默认开)条件依赖 `zip`/`tar`/`flate2`;`fs_util` 同 gate(依赖 archive 函数)。`--no-default-features` 可禁用归档独立使用。
 7. **GUI 文件转换**:command 接收路径,后端 `std::fs` 读写(Rust 后端不受 capabilities 约束),仅 `tauri-plugin-dialog` 取路径,无需 fs 插件,capabilities 仅加 `dialog:default` 保持最小权限。
 8. **产物碰撞**:`OpenOptions::create_new(true)` 原子检查无 TOCTOU 竞态,迭代 `_converted`→`(1)`→`(2)` 后缀,不静默覆盖。
 

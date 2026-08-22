@@ -1,17 +1,18 @@
 //! 文件 IO 边界:转换产物落盘与碰撞处理(依赖 std::fs,非纯内存)
 //!
-//! 组合各域纯内存转换 + 文件读写 + [`crate::path`] 路径计算,供 CLI/GUI 共享,避免边界逻辑重复。
+//! 组合各域纯内存转换 + 文件读写 + [`super::path`] 路径计算,供 CLI/GUI 共享,避免边界逻辑重复。
 //! 产物默认落源文件所在目录:解压到 `{stem}_extracted/`,转换到 `{stem}.{ext}`,
 //! 碰撞追加 `_converted`→`(1)`→`(2)`,`create_new` 原子检查不静默覆盖。
 
-use nextool_core::{ToolError, ToolResult};
+use super::{Engine, EngineRunner};
+use crate::{ToolError, ToolResult};
 use std::io::Write;
 use std::path::Path;
 
 // ---- 归档 IO(archive feature)----
 
 #[cfg(feature = "archive")]
-use crate::archive::{ArchiveEntry, ArchiveFormat};
+use super::archive::{ArchiveEntry, ArchiveFormat, ArchiveListEntry};
 
 /// 解压归档文件到目录(默认源文件旁 `_extracted`,碰撞追加 `(n)`)
 ///
@@ -22,7 +23,7 @@ pub fn extract_to_dir(
     output_dir: Option<&str>,
 ) -> ToolResult<(String, Vec<String>)> {
     let data = std::fs::read(archive_path)?;
-    let entries = crate::archive_extract(&data)?;
+    let entries = super::archive_extract(&data)?;
     let out_dir = resolve_extract_dir(archive_path, output_dir)?;
     let mut written = Vec::with_capacity(entries.len());
     for entry in entries {
@@ -52,14 +53,8 @@ pub fn compress_files(
             Ok(ArchiveEntry { path, data })
         })
         .collect::<ToolResult<_>>()?;
-    let archive = crate::archive_create(&entries, format)?;
-    match output {
-        Some(o) => {
-            write_bytes_create_new(&archive, o)?;
-            Ok(o.to_string())
-        }
-        None => write_bytes_safe(&archive, &paths[0], archive_ext(format)),
-    }
+    let archive = super::archive_create(&entries, format)?;
+    write_output(&archive, &paths[0], output, archive_ext(format))
 }
 
 /// 归档互转并落盘(默认输出到源文件旁),返回产物路径
@@ -70,14 +65,8 @@ pub fn convert_file(
     output: Option<&str>,
 ) -> ToolResult<String> {
     let data = std::fs::read(archive_path)?;
-    let out_data = crate::archive_convert(&data, target)?;
-    match output {
-        Some(o) => {
-            write_bytes_create_new(&out_data, o)?;
-            Ok(o.to_string())
-        }
-        None => write_bytes_safe(&out_data, archive_path, archive_ext(target)),
-    }
+    let out_data = super::archive_convert(&data, target)?;
+    write_output(&out_data, archive_path, output, archive_ext(target))
 }
 
 #[cfg(feature = "archive")]
@@ -103,10 +92,17 @@ fn archive_ext(fmt: ArchiveFormat) -> &'static str {
     }
 }
 
+/// 列出归档内文件(读盘 → 调纯 archive_list_entries),返回结构化条目列表
+#[cfg(feature = "archive")]
+pub fn list_archive_file(path: &str) -> ToolResult<Vec<ArchiveListEntry>> {
+    let data = std::fs::read(path)?;
+    super::archive_list_entries(&data)
+}
+
 // ---- 图像 IO(image feature)----
 
 #[cfg(feature = "image")]
-use crate::image::ImageFormat;
+use super::image::ImageFormat;
 
 /// 图像格式互转并落盘(默认输出到源文件旁),返回产物路径
 #[cfg(feature = "image")]
@@ -116,14 +112,8 @@ pub fn convert_image_file(
     output: Option<&str>,
 ) -> ToolResult<String> {
     let data = std::fs::read(input)?;
-    let out_data = crate::image_convert(&data, target)?;
-    match output {
-        Some(o) => {
-            write_bytes_create_new(&out_data, o)?;
-            Ok(o.to_string())
-        }
-        None => write_bytes_safe(&out_data, input, target.ext()),
-    }
+    let out_data = super::image_convert(&data, target)?;
+    write_output(&out_data, input, output, target.ext())
 }
 
 /// 图像缩放并落盘(默认输出到源文件旁,同格式),返回产物路径
@@ -137,15 +127,9 @@ pub fn resize_image_file(
     output: Option<&str>,
 ) -> ToolResult<String> {
     let data = std::fs::read(input)?;
-    let fmt = crate::detect_image_format(&data)?;
-    let out_data = crate::image_resize(&data, width, height, fmt)?;
-    match output {
-        Some(o) => {
-            write_bytes_create_new(&out_data, o)?;
-            Ok(o.to_string())
-        }
-        None => write_bytes_safe(&out_data, input, fmt.ext()),
-    }
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_resize(&data, width, height, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
 }
 
 // ---- PDF IO(pdf feature)----
@@ -154,7 +138,7 @@ pub fn resize_image_file(
 #[cfg(feature = "pdf")]
 pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String>> {
     let data = std::fs::read(input)?;
-    let parts = crate::pdf_split(&data)?;
+    let parts = super::pdf_split(&data)?;
     if parts.is_empty() {
         return Ok(Vec::new());
     }
@@ -183,42 +167,52 @@ pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String
 #[cfg(feature = "pdf")]
 pub fn rotate_pdf(input: &str, output: Option<&str>) -> ToolResult<String> {
     let data = std::fs::read(input)?;
-    let out_data = crate::pdf_rotate(&data)?;
-    match output {
-        Some(o) => {
-            write_bytes_create_new(&out_data, o)?;
-            Ok(o.to_string())
-        }
-        None => write_bytes_safe(&out_data, input, "pdf"),
-    }
+    let out_data = super::pdf_rotate(&data)?;
+    write_output(&out_data, input, output, "pdf")
 }
 
 /// 加密 PDF 并落盘(默认输出到源文件旁),返回产物路径
 #[cfg(feature = "pdf")]
 pub fn encrypt_pdf(input: &str, password: &str, output: Option<&str>) -> ToolResult<String> {
     let data = std::fs::read(input)?;
-    let out_data = crate::pdf_encrypt(&data, password)?;
-    match output {
-        Some(o) => {
-            write_bytes_create_new(&out_data, o)?;
-            Ok(o.to_string())
-        }
-        None => write_bytes_safe(&out_data, input, "pdf"),
-    }
+    let out_data = super::pdf_encrypt(&data, password)?;
+    write_output(&out_data, input, output, "pdf")
 }
 
 /// 解密 PDF 并落盘(默认输出到源文件旁),返回产物路径
 #[cfg(feature = "pdf")]
 pub fn decrypt_pdf(input: &str, password: &str, output: Option<&str>) -> ToolResult<String> {
     let data = std::fs::read(input)?;
-    let out_data = crate::pdf_decrypt(&data, password)?;
-    match output {
-        Some(o) => {
-            write_bytes_create_new(&out_data, o)?;
-            Ok(o.to_string())
-        }
-        None => write_bytes_safe(&out_data, input, "pdf"),
-    }
+    let out_data = super::pdf_decrypt(&data, password)?;
+    write_output(&out_data, input, output, "pdf")
+}
+
+/// 检查 PDF 文件是否已加密(读盘 → 调纯 pdf_is_encrypted)
+#[cfg(feature = "pdf")]
+pub fn is_pdf_encrypted_file(path: &str) -> ToolResult<bool> {
+    let data = std::fs::read(path)?;
+    super::pdf_is_encrypted(&data)
+}
+
+// ---- 引擎 IO ----
+
+/// 引擎转换并落盘(默认输出到源文件旁),返回产物路径
+///
+/// 引擎直接操作文件路径(非字节域):计算输出路径 → 检查可用性 → 委托执行。
+/// 显式 `output` 用之;否则源文件旁 `{stem}.{output_ext}`(引擎默认覆盖,与字节域碰撞策略不同)。
+pub fn engine_convert_file(
+    input: &str,
+    engine: Engine,
+    output_ext: &str,
+    output: Option<&str>,
+    runner: &dyn EngineRunner,
+) -> ToolResult<String> {
+    let out_path = match output {
+        Some(o) => o.to_string(),
+        None => super::path::compute_output_path(input, output_ext, 0),
+    };
+    super::engine_convert(runner, engine, input, &out_path)?;
+    Ok(out_path)
 }
 
 // ---- 通用 IO helpers(无 feature gate)----
@@ -239,19 +233,46 @@ fn write_bytes_create_new(data: &[u8], path: &str) -> Result<(), std::io::Error>
     std::io::BufWriter::new(file).write_all(data)
 }
 
-/// 迭代碰撞后缀写入直到成功,返回最终路径;超过 100 次报错
-fn write_bytes_safe(data: &[u8], input_path: &str, target_ext: &str) -> ToolResult<String> {
+/// 迭代碰撞后缀直到创建成功:路径由 `path_fn` 生成,创建由 `op` 执行;超过 100 次报错
+fn retry_unique<F, O>(path_fn: F, op: O, collision_msg: &str) -> ToolResult<String>
+where
+    F: Fn(u32) -> String,
+    O: Fn(&str) -> Result<(), std::io::Error>,
+{
     for attempt in 0..100u32 {
-        let out = crate::path::compute_output_path(input_path, target_ext, attempt);
-        match write_bytes_create_new(data, &out) {
-            Ok(()) => return Ok(out),
+        let path = path_fn(attempt);
+        match op(&path) {
+            Ok(()) => return Ok(path),
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(e) => return Err(ToolError::Io(e)),
         }
     }
-    Err(ToolError::Other(
-        "碰撞次数过多:同名产物已存在 100 个".into(),
-    ))
+    Err(ToolError::Other(collision_msg.into()))
+}
+
+/// 统一产物落盘:显式 `output` 路径则原子写入;否则碰撞重试写源文件旁
+fn write_output(
+    data: &[u8],
+    input_path: &str,
+    output: Option<&str>,
+    target_ext: &str,
+) -> ToolResult<String> {
+    match output {
+        Some(o) => {
+            write_bytes_create_new(data, o)?;
+            Ok(o.to_string())
+        }
+        None => write_bytes_safe(data, input_path, target_ext),
+    }
+}
+
+/// 迭代碰撞后缀写入直到成功,返回最终路径;超过 100 次报错
+fn write_bytes_safe(data: &[u8], input_path: &str, target_ext: &str) -> ToolResult<String> {
+    retry_unique(
+        |a| super::path::compute_output_path(input_path, target_ext, a),
+        |p| write_bytes_create_new(data, p),
+        "碰撞次数过多:同名产物已存在 100 个",
+    )
 }
 
 /// 确定解压/拆分输出目录:显式指定用之;否则源文件旁 `{stem}_extracted`,碰撞追加 `(n)`
@@ -262,18 +283,10 @@ fn resolve_extract_dir(input: &str, output_dir: Option<&str>) -> ToolResult<Stri
             std::fs::create_dir_all(d)?;
             Ok(d.to_string())
         }
-        None => {
-            for attempt in 0..100u32 {
-                let dir = crate::path::compute_extract_dir(input, attempt);
-                match std::fs::create_dir(&dir) {
-                    Ok(()) => return Ok(dir),
-                    Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                    Err(e) => return Err(ToolError::Io(e)),
-                }
-            }
-            Err(ToolError::Other(
-                "碰撞次数过多:同名解压目录已存在 100 个".into(),
-            ))
-        }
+        None => retry_unique(
+            |a| super::path::compute_extract_dir(input, a),
+            |p| std::fs::create_dir(p),
+            "碰撞次数过多:同名解压目录已存在 100 个",
+        ),
     }
 }

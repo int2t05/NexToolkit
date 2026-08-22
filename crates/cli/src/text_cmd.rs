@@ -2,7 +2,7 @@
 
 use clap::{Args, Subcommand};
 
-use crate::io::read_input;
+use crate::io::{print_text, read_input};
 use nextool_core::CaseMode;
 
 #[derive(Args)]
@@ -15,7 +15,7 @@ pub struct TextArgs {
 enum TextCmd {
     /// 大小写转换:upper/lower/title/snake/camel/kebab
     Case {
-        mode: CaseModeArg,
+        mode: CaseMode,
         input: Option<String>,
     },
     /// 行排序(升序)
@@ -42,74 +42,31 @@ enum TextCmd {
     },
 }
 
-#[derive(Clone, Copy, clap::ValueEnum)]
-enum CaseModeArg {
-    Upper,
-    Lower,
-    Title,
-    Snake,
-    Camel,
-    Kebab,
-}
-
-impl From<CaseModeArg> for CaseMode {
-    fn from(m: CaseModeArg) -> Self {
-        match m {
-            CaseModeArg::Upper => CaseMode::Upper,
-            CaseModeArg::Lower => CaseMode::Lower,
-            CaseModeArg::Title => CaseMode::Title,
-            CaseModeArg::Snake => CaseMode::Snake,
-            CaseModeArg::Camel => CaseMode::Camel,
-            CaseModeArg::Kebab => CaseMode::Kebab,
-        }
-    }
-}
-
 pub fn run(args: TextArgs) -> Result<(), String> {
     match args.cmd {
         TextCmd::Case { mode, input } => {
-            let input = read_input(input)?;
-            println!(
-                "{}",
-                nextool_core::case_convert(&input, mode.into()).map_err(|e| e.to_string())?
-            );
+            print_text(input, |s| nextool_core::case_convert(s, mode))?;
         }
         TextCmd::SortLines { input } => {
-            println!(
-                "{}",
-                nextool_core::sort_lines(&read_input(input)?).map_err(|e| e.to_string())?
-            );
+            print_text(input, nextool_core::sort_lines)?;
         }
         TextCmd::DedupLines { input } => {
-            println!(
-                "{}",
-                nextool_core::dedup_lines(&read_input(input)?).map_err(|e| e.to_string())?
-            );
+            print_text(input, nextool_core::dedup_lines)?;
         }
         TextCmd::Reverse { input } => {
-            println!(
-                "{}",
-                nextool_core::reverse_text(&read_input(input)?).map_err(|e| e.to_string())?
-            );
+            print_text(input, nextool_core::reverse_text)?;
         }
         TextCmd::RegexMatch { pattern, input } => {
-            let input = read_input(input)?;
-            println!(
-                "{}",
-                nextool_core::regex_match(&pattern, &input).map_err(|e| e.to_string())?
-            );
+            print_text(input, |s| nextool_core::regex_match(&pattern, s))?;
         }
         TextCmd::RegexReplace {
             pattern,
             replacement,
             input,
         } => {
-            let input = read_input(input)?;
-            println!(
-                "{}",
-                nextool_core::regex_replace(&pattern, &replacement, &input)
-                    .map_err(|e| e.to_string())?
-            );
+            print_text(input, |s| {
+                nextool_core::regex_replace(&pattern, &replacement, s)
+            })?;
         }
         TextCmd::Diff { a, b } => {
             let a = read_input(a)?;

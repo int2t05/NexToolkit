@@ -2,7 +2,7 @@
 
 use clap::{Args, Subcommand};
 
-use crate::io::read_input;
+use crate::io::{print_text, read_input};
 
 #[derive(Args)]
 pub struct EncodeArgs {
@@ -39,44 +39,30 @@ enum Mode {
 pub fn run(args: EncodeArgs) -> Result<(), String> {
     match args.cmd {
         EncodeCmd::Base64 { mode, input } => {
-            let input = read_input(input)?;
-            let out = match mode {
-                Mode::Encode => nextool_core::base64_encode(&input),
-                Mode::Decode => nextool_core::base64_decode(&input),
-            };
-            println!("{}", out.map_err(|e| e.to_string())?);
+            print_text(input, |s| match mode {
+                Mode::Encode => nextool_core::base64_encode(s),
+                Mode::Decode => nextool_core::base64_decode(s),
+            })?;
         }
         EncodeCmd::Url { mode, input } => {
-            let input = read_input(input)?;
-            let out = match mode {
-                Mode::Encode => nextool_core::url_encode(&input),
-                Mode::Decode => nextool_core::url_decode(&input),
-            };
-            println!("{}", out.map_err(|e| e.to_string())?);
+            print_text(input, |s| match mode {
+                Mode::Encode => nextool_core::url_encode(s),
+                Mode::Decode => nextool_core::url_decode(s),
+            })?;
         }
         EncodeCmd::Html { mode, input } => {
-            let input = read_input(input)?;
-            let out = match mode {
-                Mode::Encode => nextool_core::html_encode(&input),
-                Mode::Decode => nextool_core::html_decode(&input),
-            };
-            println!("{}", out.map_err(|e| e.to_string())?);
+            print_text(input, |s| match mode {
+                Mode::Encode => nextool_core::html_encode(s),
+                Mode::Decode => nextool_core::html_decode(s),
+            })?;
         }
         EncodeCmd::Hex { mode, input } => {
-            let input = read_input(input)?;
-            let out = match mode {
-                Mode::Encode => nextool_core::hex_encode(&input),
-                Mode::Decode => nextool_core::hex_decode(&input),
-            };
-            println!("{}", out.map_err(|e| e.to_string())?);
+            print_text(input, |s| match mode {
+                Mode::Encode => nextool_core::hex_encode(s),
+                Mode::Decode => nextool_core::hex_decode(s),
+            })?;
         }
-        EncodeCmd::Jwt { input } => {
-            let input = read_input(input)?;
-            println!(
-                "{}",
-                nextool_core::jwt_decode(&input).map_err(|e| e.to_string())?
-            );
-        }
+        EncodeCmd::Jwt { input } => print_text(input, nextool_core::jwt_decode)?,
         EncodeCmd::JwtVerify { key, input } => {
             let input = read_input(input)?;
             // key 若以 -----BEGIN 视为内联 PEM,否则作 HS256 secret(也可文件路径)

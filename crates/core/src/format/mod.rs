@@ -1,5 +1,8 @@
 //! 格式化模块:JSON/SQL/XML/CSS 美化与压缩
 
+mod tools;
+pub use tools::*;
+
 use crate::{ToolError, ToolResult};
 
 /// JSON 美化:解析后以 2 空格缩进重新序列化

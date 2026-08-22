@@ -1,15 +1,26 @@
 //! 文本工具模块:大小写/排序去重/反转/正则/Diff
 
-use crate::{ToolError, ToolResult};
+mod tools;
+pub use tools::*;
+
+use crate::ToolResult;
 
 /// 大小写转换模式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::AsRefStr, strum::EnumString, strum::EnumIter,
+)]
 pub enum CaseMode {
+    #[strum(serialize = "upper")]
     Upper,
+    #[strum(serialize = "lower")]
     Lower,
+    #[strum(serialize = "title")]
     Title,
+    #[strum(serialize = "snake")]
     Snake,
+    #[strum(serialize = "camel")]
     Camel,
+    #[strum(serialize = "kebab")]
     Kebab,
 }
 
@@ -140,7 +151,7 @@ pub fn reverse_text(s: &str) -> ToolResult<String> {
 
 /// 正则匹配:每个匹配各占一行,无匹配返回空串,非法正则返回 Err
 pub fn regex_match(pattern: &str, input: &str) -> ToolResult<String> {
-    let re = regex::Regex::new(pattern).map_err(|e| ToolError::Parse(e.to_string()))?;
+    let re = regex::Regex::new(pattern)?;
     let matches: Vec<String> = re
         .find_iter(input)
         .map(|m| m.as_str().to_string())
@@ -150,7 +161,7 @@ pub fn regex_match(pattern: &str, input: &str) -> ToolResult<String> {
 
 /// 正则全局替换,支持 $0/$1 捕获组
 pub fn regex_replace(pattern: &str, replacement: &str, input: &str) -> ToolResult<String> {
-    let re = regex::Regex::new(pattern).map_err(|e| ToolError::Parse(e.to_string()))?;
+    let re = regex::Regex::new(pattern)?;
     Ok(re.replace_all(input, replacement).into_owned())
 }
 

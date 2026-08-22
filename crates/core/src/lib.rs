@@ -7,20 +7,24 @@
 pub mod convert;
 pub mod crypto;
 pub mod encode;
+pub mod fileconv;
 pub mod format;
 pub mod generate;
 pub mod http;
 pub mod nettime;
+pub mod registry;
 pub mod text;
 pub mod unit;
 
 pub use convert::*;
 pub use crypto::*;
 pub use encode::*;
+pub use fileconv::*;
 pub use format::*;
 pub use generate::*;
 pub use http::*;
 pub use nettime::*;
+pub use registry::*;
 pub use text::*;
 pub use unit::*;
 
@@ -38,6 +42,18 @@ pub enum ToolError {
 
     #[error("IO 错误: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("YAML 错误: {0}")]
+    Yaml(#[from] serde_yaml::Error),
+
+    #[error("TOML 错误: {0}")]
+    Toml(#[from] toml::de::Error),
+
+    #[error("CSV 错误: {0}")]
+    Csv(#[from] csv::Error),
+
+    #[error("正则错误: {0}")]
+    Regex(#[from] regex::Error),
 
     #[error("输入为空")]
     EmptyInput,

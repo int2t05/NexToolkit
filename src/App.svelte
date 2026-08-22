@@ -1,12 +1,48 @@
 <script lang="ts">
-  import { TOOLS, GROUP_LABEL, type Group, type Tool } from './tools';
+  import { onMount } from 'svelte';
   import { invoke } from './bindings';
   import { open as openDialog } from '@tauri-apps/plugin-dialog';
   import hljs from 'highlight.js';
 
+  // 工具元数据 DTO(对齐 Rust ToolMetaDto/ParamSpecDto,snake_case 字段经 serde 直传)
+  interface ParamSpecDto {
+    key: string;
+    kind: string; // text|textarea|select|number|password|bool|file
+    label: string;
+    default: string | null;
+    options: string[];
+    placeholder: string | null;
+    multiple: boolean;
+  }
+
+  interface ToolMetaDto {
+    id: string;
+    name: string;
+    desc: string;
+    group: string;
+    params: ParamSpecDto[];
+    needs_main_input: boolean;
+    output_kind: string; // text|svg|<highlight.js 语言名>
+  }
+
+  // 分组标签(原 tools.ts 内联,现随动态渲染迁移至此)
+  const GROUP_LABEL: Record<string, { zh: string; en: string }> = {
+    encode: { zh: '编解码', en: 'Encoders' },
+    convert: { zh: '转换', en: 'Converters' },
+    format: { zh: '格式化', en: 'Formatters' },
+    generate: { zh: '生成器', en: 'Generators' },
+    text: { zh: '文本', en: 'Text' },
+    crypto: { zh: '加密', en: 'Crypto' },
+    nettime: { zh: '网络/时间', en: 'Net/Time' },
+    fileconv: { zh: '文件转换', en: 'Files' },
+  };
+  const groups: string[] = ['encode', 'convert', 'format', 'generate', 'text', 'crypto', 'nettime', 'fileconv'];
+
   let lang: 'zh' | 'en' = $state('zh');
   let query = $state('');
-  let selectedTool = $state<Tool>(TOOLS[0]);
+  let allTools = $state<ToolMetaDto[]>([]);
+  let textIds = $state<Set<string>>(new Set());
+  let selectedTool = $state<ToolMetaDto | null>(null);
   let mainInput = $state('');
   let params = $state<Record<string, string>>({});
   let files = $state<Record<string, string[]>>({});
@@ -23,32 +59,44 @@
   const FAV_KEY = 'nextoolkit-favorites';
   let favorites = $state<Set<string>>(loadFavorites());
 
-  const groups: Group[] = ['encode', 'convert', 'format', 'generate', 'text', 'crypto', 'nettime', 'fileconv'];
+  onMount(async () => {
+    try {
+      const [textTools, fileTools] = await Promise.all([
+        invoke<ToolMetaDto[]>('list_tools'),
+        invoke<ToolMetaDto[]>('list_file_tools'),
+      ]);
+      textIds = new Set(textTools.map((t) => t.id));
+      allTools = [...textTools, ...fileTools];
+      if (allTools.length > 0) selectTool(allTools[0]);
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+  });
 
   // 按搜索词过滤工具
   const filteredTools = $derived.by(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return TOOLS;
-    return TOOLS.filter((t) => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
+    if (!q) return allTools;
+    return allTools.filter((t) => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
   });
 
   // 命令面板过滤结果
   const paletteTools = $derived.by(() => {
     const q = paletteQuery.trim().toLowerCase();
-    if (!q) return TOOLS;
-    return TOOLS.filter((t) => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
+    if (!q) return allTools;
+    return allTools.filter((t) => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
   });
 
   // 收藏工具列表(置顶显示)
-  const favoriteTools = $derived(TOOLS.filter((t) => favorites.has(t.id)));
+  const favoriteTools = $derived(allTools.filter((t) => favorites.has(t.id)));
 
-  // 输出语法高亮:按工具推断语言
+  // 输出语法高亮:按工具 output_kind 决定语言(text/svg 不高亮)
   const highlightedOutput = $derived.by(() => {
-    if (!output) return '';
-    const language = outputLanguage(selectedTool.id);
-    if (!language) return escapeHtml(output);
+    if (!output || !selectedTool) return '';
+    const kind = selectedTool.output_kind;
+    if (kind === 'text' || kind === 'svg') return escapeHtml(output);
     try {
-      return hljs.highlight(output, { language }).value;
+      return hljs.highlight(output, { language: kind }).value;
     } catch {
       return escapeHtml(output);
     }
@@ -75,17 +123,6 @@
     saveFavorites();
   }
 
-  // 工具 id 到高亮语言的映射
-  function outputLanguage(toolId: string): string | null {
-    if (toolId.startsWith('json_') || toolId === 'jwt_decode' || toolId === 'jwt_verify') return 'json';
-    if (toolId === 'sql_format') return 'sql';
-    if (toolId.startsWith('xml_')) return 'xml';
-    if (toolId === 'yaml_to_json') return 'json';
-    if (toolId === 'json_to_yaml' || toolId === 'toml_to_json') return 'yaml';
-    if (toolId === 'md_to_html') return 'xml';
-    return null;
-  }
-
   function escapeHtml(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
@@ -102,7 +139,7 @@
   }
 
   // 选中工具时,初始化参数默认值
-  function selectTool(tool: Tool) {
+  function selectTool(tool: ToolMetaDto) {
     selectedTool = tool;
     const defaults: Record<string, string> = {};
     for (const p of tool.params) {
@@ -127,26 +164,38 @@
     return list.map((p) => p.split(/[\\/]/).pop() ?? p).join(', ');
   }
 
+  // 执行:文本工具经 run_tool(id,input,args) 通用入口;文件工具经 invoke(id, args 对象)
   async function run() {
+    if (!selectedTool) return;
     loading = true;
     error = '';
     output = '';
     try {
-      const args: Record<string, unknown> = {};
-      for (const p of selectedTool.params) {
-        if (p.kind === 'file') {
-          args[p.key] = p.multiple ? files[p.key] ?? [] : (files[p.key]?.[0] ?? '');
-        } else if (p.kind === 'number') {
-          args[p.key] = Number(params[p.key] ?? 0);
-        } else {
-          args[p.key] = params[p.key] ?? '';
+      let result: unknown;
+      if (textIds.has(selectedTool.id)) {
+        // 文本工具:args 为 Vec<(String,String)>,前端传 [[key,value],...]
+        const args = selectedTool.params
+          .filter((p) => p.kind !== 'file')
+          .map((p) => [p.key, String(params[p.key] ?? '')] as [string, string]);
+        result = await invoke<string>('run_tool', {
+          id: selectedTool.id,
+          input: mainInput,
+          args,
+        });
+      } else {
+        // 文件工具:args 对象,number 转 Number,file 取 files
+        const args: Record<string, unknown> = {};
+        for (const p of selectedTool.params) {
+          if (p.kind === 'file') {
+            args[p.key] = p.multiple ? (files[p.key] ?? []) : (files[p.key]?.[0] ?? '');
+          } else if (p.kind === 'number') {
+            args[p.key] = Number(params[p.key] ?? 0);
+          } else {
+            args[p.key] = params[p.key] ?? '';
+          }
         }
+        result = await invoke<unknown>(selectedTool.id, args);
       }
-      // diff 工具的"对比文本"参数用 other;主输入作 input
-      if (selectedTool.needsMainInput) {
-        args['input'] = mainInput;
-      }
-      const result = await invoke<unknown>(selectedTool.id, args);
       output = Array.isArray(result) ? result.join('\n') : String(result);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -163,7 +212,7 @@
   }
 
   function isSvgOutput(): boolean {
-    return selectedTool.id === 'qr_svg';
+    return selectedTool?.output_kind === 'svg';
   }
 
   function t(zh: string, en: string): string {
@@ -208,7 +257,7 @@
       {#each favoriteTools as tool}
         <button
           class="tool-btn"
-          class:active={selectedTool.id === tool.id}
+          class:active={selectedTool?.id === tool.id}
           onclick={() => selectTool(tool)}
         >
           {tool.name}
@@ -222,7 +271,7 @@
         {#each tools as tool}
           <button
             class="tool-btn"
-            class:active={selectedTool.id === tool.id}
+            class:active={selectedTool?.id === tool.id}
             onclick={() => selectTool(tool)}
           >
             {tool.name}
@@ -233,76 +282,80 @@
   </nav>
 
   <section class="panel">
-    <div class="tool-header">
-      <h2>{selectedTool.name}</h2>
-      <button class="fav-btn" class:active={favorites.has(selectedTool.id)} onclick={() => toggleFavorite(selectedTool.id)} title={t('收藏', 'Favorite')}>
-        {favorites.has(selectedTool.id) ? '★' : '☆'}
-      </button>
-    </div>
-    <p class="desc">{selectedTool.desc}</p>
-
-    {#if selectedTool.params.length > 0}
-      <div class="params">
-        {#each selectedTool.params as p}
-          <label class="param">
-            <span>{p.label}</span>
-            {#if p.kind === 'textarea'}
-              <textarea rows="3" bind:value={params[p.key]} placeholder={p.placeholder ?? ''}></textarea>
-            {:else if p.kind === 'select'}
-              <select bind:value={params[p.key]}>
-                {#each p.options ?? [] as opt}
-                  <option value={opt}>{opt}</option>
-                {/each}
-              </select>
-            {:else if p.kind === 'file'}
-              <button class="file-pick" onclick={() => pickFile(p.key, p.multiple ?? false)}>
-                {t('选择文件', 'Choose file')}{p.multiple ? ` (${t('多选', 'multi')})` : ''}
-              </button>
-              {#if fileDisplay(p.key)}
-                <span class="file-name">{fileDisplay(p.key)}</span>
-              {/if}
-            {:else if p.kind === 'password'}
-              <input type="password" bind:value={params[p.key]} placeholder={p.placeholder ?? ''} />
-            {:else if p.kind === 'number'}
-              <input type="number" bind:value={params[p.key]} />
-            {:else}
-              <input type="text" bind:value={params[p.key]} placeholder={p.placeholder ?? ''} />
-            {/if}
-          </label>
-        {/each}
-      </div>
-    {/if}
-
-    {#if selectedTool.needsMainInput}
-      <textarea
-        class="main-input"
-        rows="8"
-        placeholder={t('输入…', 'Input…')}
-        bind:value={mainInput}
-      ></textarea>
-    {/if}
-
-    <div class="actions">
-      <button class="run" onclick={run} disabled={loading}>
-        {loading ? t('运行中…', 'Running…') : t('运行', 'Run')}
-      </button>
-      {#if output}
-        <button class="copy" onclick={copyOutput}>
-          {copied ? '✓' : t('复制', 'Copy')}
+    {#if selectedTool}
+      <div class="tool-header">
+        <h2>{selectedTool.name}</h2>
+        <button class="fav-btn" class:active={favorites.has(selectedTool.id)} onclick={() => toggleFavorite(selectedTool.id)} title={t('收藏', 'Favorite')}>
+          {favorites.has(selectedTool.id) ? '★' : '☆'}
         </button>
-      {/if}
-    </div>
+      </div>
+      <p class="desc">{selectedTool.desc}</p>
 
-    {#if error}
-      <pre class="error">{error}</pre>
-    {/if}
-
-    {#if output}
-      {#if isSvgOutput()}
-        <div class="svg-out">{@html output}</div>
-      {:else}
-        <pre class="output"><code class="hljs">{@html highlightedOutput}</code></pre>
+      {#if selectedTool.params.length > 0}
+        <div class="params">
+          {#each selectedTool.params as p}
+            <label class="param">
+              <span>{p.label}</span>
+              {#if p.kind === 'textarea'}
+                <textarea rows="3" bind:value={params[p.key]} placeholder={p.placeholder ?? ''}></textarea>
+              {:else if p.kind === 'select'}
+                <select bind:value={params[p.key]}>
+                  {#each p.options as opt}
+                    <option value={opt}>{opt}</option>
+                  {/each}
+                </select>
+              {:else if p.kind === 'file'}
+                <button class="file-pick" onclick={() => pickFile(p.key, p.multiple)}>
+                  {t('选择文件', 'Choose file')}{p.multiple ? ` (${t('多选', 'multi')})` : ''}
+                </button>
+                {#if fileDisplay(p.key)}
+                  <span class="file-name">{fileDisplay(p.key)}</span>
+                {/if}
+              {:else if p.kind === 'password'}
+                <input type="password" bind:value={params[p.key]} placeholder={p.placeholder ?? ''} />
+              {:else if p.kind === 'number'}
+                <input type="number" bind:value={params[p.key]} />
+              {:else}
+                <input type="text" bind:value={params[p.key]} placeholder={p.placeholder ?? ''} />
+              {/if}
+            </label>
+          {/each}
+        </div>
       {/if}
+
+      {#if selectedTool.needs_main_input}
+        <textarea
+          class="main-input"
+          rows="8"
+          placeholder={t('输入…', 'Input…')}
+          bind:value={mainInput}
+        ></textarea>
+      {/if}
+
+      <div class="actions">
+        <button class="run" onclick={run} disabled={loading}>
+          {loading ? t('运行中…', 'Running…') : t('运行', 'Run')}
+        </button>
+        {#if output}
+          <button class="copy" onclick={copyOutput}>
+            {copied ? '✓' : t('复制', 'Copy')}
+          </button>
+        {/if}
+      </div>
+
+      {#if error}
+        <pre class="error">{error}</pre>
+      {/if}
+
+      {#if output}
+        {#if isSvgOutput()}
+          <div class="svg-out">{@html output}</div>
+        {:else}
+          <pre class="output"><code class="hljs">{@html highlightedOutput}</code></pre>
+        {/if}
+      {/if}
+    {:else}
+      <p class="desc">{t('加载工具中…', 'Loading tools…')}</p>
     {/if}
   </section>
 </main>

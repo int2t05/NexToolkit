@@ -1,13 +1,22 @@
 //! 生成器模块:Hash/HMAC/UUID/密码/Lorem/QR
 
+mod tools;
+pub use tools::*;
+
 use crate::{ToolError, ToolResult};
 
 /// 哈希算法类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::AsRefStr, strum::EnumString, strum::EnumIter,
+)]
 pub enum HashAlgo {
+    #[strum(serialize = "md5")]
     Md5,
+    #[strum(serialize = "sha1")]
     Sha1,
+    #[strum(serialize = "sha256")]
     Sha256,
+    #[strum(serialize = "sha512")]
     Sha512,
 }
 
@@ -99,15 +108,35 @@ pub struct PasswordOpts {
     pub symbols: bool,
 }
 
+/// 默认字符集:字母 + 数字(不含符号)
+impl Default for PasswordOpts {
+    fn default() -> Self {
+        Self {
+            upper: true,
+            lower: true,
+            digits: true,
+            symbols: false,
+        }
+    }
+}
+
 /// 随机生成密码,从启用的字符集中采样
 ///
-/// length < 1 或字符集全 false 时返回 Err。
+/// length < 1 时返回 Err。字符集全 false 时使用默认(字母数字,不含符号),
+/// 保证 CLI/GUI 行为一致。
 pub fn password_generate(length: usize, opts: &PasswordOpts) -> ToolResult<String> {
     use rand::Rng;
 
     if length < 1 {
         return Err(ToolError::InvalidInput("密码长度不能小于 1".to_string()));
     }
+
+    // 全 false 时使用默认字符集,避免 CLI/GUI 各自处理默认逻辑
+    let opts = if !opts.upper && !opts.lower && !opts.digits && !opts.symbols {
+        PasswordOpts::default()
+    } else {
+        *opts
+    };
 
     let mut charset = String::new();
     if opts.upper {
@@ -330,14 +359,17 @@ mod tests {
     }
 
     #[test]
-    fn password_no_charset() {
+    fn password_all_false_uses_default() {
+        // 全 false 时使用默认字符集(字母数字),不返回错误
         let opts = PasswordOpts {
             upper: false,
             lower: false,
             digits: false,
             symbols: false,
         };
-        assert!(password_generate(16, &opts).is_err());
+        let pwd = password_generate(16, &opts).unwrap();
+        assert_eq!(pwd.len(), 16);
+        assert!(pwd.chars().all(|c| c.is_alphanumeric()));
     }
 
     // ---- lorem_ipsum ----

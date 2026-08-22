@@ -3,19 +3,28 @@
 //! 支持 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO。输入输出为 `&[u8]`/`Vec<u8>`,不碰文件系统。
 //! 格式经 image crate 魔术字节检测;转换经 `load_from_memory` → `encode_to`。
 
+use crate::{ToolError, ToolResult};
 use image::GenericImageView;
-use nextool_core::{ToolError, ToolResult};
 use std::io::Cursor;
 
 /// 图像格式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::AsRefStr, strum::EnumString, strum::EnumIter,
+)]
 pub enum ImageFormat {
+    #[strum(serialize = "png")]
     Png,
+    #[strum(serialize = "jpg")]
     Jpeg,
+    #[strum(serialize = "gif")]
     Gif,
+    #[strum(serialize = "bmp")]
     Bmp,
+    #[strum(serialize = "webp")]
     Webp,
+    #[strum(serialize = "tiff")]
     Tiff,
+    #[strum(serialize = "ico")]
     Ico,
 }
 

@@ -3,7 +3,7 @@
 //! 输入输出为 `&[u8]`/`Vec<u8>`,不碰文件系统。基于 lopdf 的 Document 操作。
 //! 合并(merge)因 lopdf 0.44 无内置页树合并 API,实现复杂度高,推迟(见 todo)。
 
-use nextool_core::{ToolError, ToolResult};
+use crate::{ToolError, ToolResult};
 use std::io::Cursor;
 
 /// 拆分 PDF:每页一个独立 PDF,返回字节列表(顺序对应页序)

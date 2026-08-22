@@ -2,7 +2,7 @@
 
 use clap::{Args, Subcommand};
 
-use crate::io::read_input;
+use crate::io::print_text;
 
 #[derive(Args)]
 pub struct ConvertArgs {
@@ -54,42 +54,26 @@ enum ConvertMode {
 pub fn run(args: ConvertArgs) -> Result<(), String> {
     match args.cmd {
         ConvertCmd::JsonYaml { mode, input } => {
-            let input = read_input(input)?;
-            let out = match mode {
-                ConvertMode::To => nextool_core::json_to_yaml(&input),
-                ConvertMode::From => nextool_core::yaml_to_json(&input),
-            };
-            println!("{}", out.map_err(|e| e.to_string())?);
+            print_text(input, |s| match mode {
+                ConvertMode::To => nextool_core::json_to_yaml(s),
+                ConvertMode::From => nextool_core::yaml_to_json(s),
+            })?;
         }
         ConvertCmd::JsonToml { mode, input } => {
-            let input = read_input(input)?;
-            let out = match mode {
-                ConvertMode::To => nextool_core::json_to_toml(&input),
-                ConvertMode::From => nextool_core::toml_to_json(&input),
-            };
-            println!("{}", out.map_err(|e| e.to_string())?);
+            print_text(input, |s| match mode {
+                ConvertMode::To => nextool_core::json_to_toml(s),
+                ConvertMode::From => nextool_core::toml_to_json(s),
+            })?;
         }
         ConvertCmd::JsonCsv { mode, input } => {
-            let input = read_input(input)?;
-            let out = match mode {
-                ConvertMode::To => nextool_core::json_to_csv(&input),
-                ConvertMode::From => nextool_core::csv_to_json(&input),
-            };
-            println!("{}", out.map_err(|e| e.to_string())?);
+            print_text(input, |s| match mode {
+                ConvertMode::To => nextool_core::json_to_csv(s),
+                ConvertMode::From => nextool_core::csv_to_json(s),
+            })?;
         }
-        ConvertCmd::MdHtml { input } => {
-            let input = read_input(input)?;
-            println!(
-                "{}",
-                nextool_core::md_to_html(&input).map_err(|e| e.to_string())?
-            );
-        }
+        ConvertCmd::MdHtml { input } => print_text(input, nextool_core::md_to_html)?,
         ConvertCmd::Numbase { from, to, input } => {
-            let input = read_input(input)?;
-            println!(
-                "{}",
-                nextool_core::numbase_convert(&input, from, to).map_err(|e| e.to_string())?
-            );
+            print_text(input, |s| nextool_core::numbase_convert(s, from, to))?;
         }
         ConvertCmd::Unit { value, from, to } => {
             let result =
