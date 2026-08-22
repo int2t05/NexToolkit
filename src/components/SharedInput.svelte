@@ -25,10 +25,10 @@
   .shared-input {
     display: flex;
     flex-direction: column;
-    background: var(--ntx-bg);
-    border: 1px solid var(--ntx-border);
-    border-radius: var(--ntx-radius-base);
+    background: var(--ntx-surface);
+    border-radius: var(--ntx-radius-lg);
     overflow: hidden;
+    box-shadow: var(--ntx-shadow-md);
   }
   .input-header {
     display: flex;
@@ -65,7 +65,6 @@
     font-family: var(--ntx-font-mono);
     font-size: 13px;
     resize: vertical;
-    outline: none;
     min-height: 200px;
   }
   .input-area::placeholder {

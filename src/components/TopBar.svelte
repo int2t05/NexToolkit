@@ -36,11 +36,9 @@
     color: var(--ntx-fg);
   }
   .badge {
-    font-size: 12px;
-    color: var(--ntx-success);
-    background: var(--ntx-success-soft);
+    font-size: var(--ntx-text-sm);
+    color: var(--ntx-fg-muted);
     padding: 3px var(--ntx-space-2);
-    border-radius: var(--ntx-radius-sm);
   }
   .spacer {
     flex: 1;

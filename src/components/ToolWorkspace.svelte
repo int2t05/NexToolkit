@@ -78,7 +78,11 @@
 
     <div class="actions">
       <button class="run-btn" onclick={() => appState.run()} disabled={appState.loading}>
-        <Play size={14} />
+        {#if appState.loading}
+          <span class="spinner"></span>
+        {:else}
+          <Play size={14} />
+        {/if}
         {appState.loading ? appState.t('运行中…', 'Running…') : appState.t('运行', 'Run')}
       </button>
       {#if appState.isBidirectional && appState.output}
@@ -175,6 +179,23 @@
     display: flex;
     gap: var(--ntx-space-2);
     margin-top: var(--ntx-space-2);
+    position: sticky;
+    bottom: 0;
+    padding: var(--ntx-space-2) 0;
+    background: color-mix(in oklch, var(--ntx-bg) 85%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--ntx-primary-fg);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: ntx-spin 0.7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes ntx-spin {
+    to { transform: rotate(360deg); }
   }
   .run-btn {
     display: inline-flex;

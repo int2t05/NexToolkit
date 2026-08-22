@@ -16,7 +16,7 @@
   /* ── 文字 ────────────────────────────────────────── */
   --ntx-fg: oklch(0.90 0.005 264); /* 主文字 ~#e4e6eb */
   --ntx-fg-muted: oklch(0.68 0.010 264); /* 次要 ~#a9adb5 */
-  --ntx-fg-subtle: oklch(0.55 0.010 264); /* 提示/标签 ~#6b7280 */
+  --ntx-fg-subtle: oklch(0.62 0.010 264); /* 提示/标签(提亮满足 WCAG AA 4.5:1)~#8a8f99 */
 
   /* ── 主色(蓝)────────────────────────────────────── */
   --ntx-primary: oklch(0.55 0.20 264); /* ~#2563eb */
@@ -67,6 +67,25 @@
   --ntx-font-sans: system-ui, -apple-system, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', sans-serif;
   --ntx-font-mono: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
 
+  /* ── 字号阶梯(对齐 Apple HIG:大标题→标题→正文→说明→脚注)── */
+  --ntx-text-xs: 11px; /* caption 脚注 */
+  --ntx-text-sm: 12px; /* subhead 说明 */
+  --ntx-text-base: 13px; /* body 正文 */
+  --ntx-text-md: 15px; /* title 标题 */
+  --ntx-text-lg: 18px; /* 大标题 */
+  --ntx-text-xl: 22px; /* 大标题(large title)*/
+
+  /* ── 字重/行高 ──────────────────────────────────── */
+  --ntx-weight-regular: 400;
+  --ntx-weight-medium: 500;
+  --ntx-weight-semibold: 600;
+  --ntx-weight-bold: 700;
+  --ntx-leading-tight: 1.25; /* 标题 */
+  --ntx-leading-normal: 1.45; /* 正文 */
+
+  /* ── 焦点环 ──────────────────────────────────────── */
+  --ntx-focus-ring: 0 0 0 3px var(--ntx-primary-soft);
+
   /* ── 圆角 ────────────────────────────────────────── */
   --ntx-radius-sm: 6px;
   --ntx-radius-base: 8px;
@@ -78,7 +97,7 @@
   --ntx-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.35);
   --ntx-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
 
-  /* ── 过渡 ────────────────────────────────────────── */
-  --ntx-transition: 150ms ease;
-  --ntx-transition-fast: 100ms ease;
+  /* ── 过渡(Apple ease-out 曲线,200ms 感知顺滑)───── */
+  --ntx-transition: 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ntx-transition-fast: 120ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }

@@ -66,7 +66,6 @@
     border: none;
     color: var(--ntx-fg);
     font-size: 14px;
-    outline: none;
   }
   .palette-list {
     max-height: 320px;

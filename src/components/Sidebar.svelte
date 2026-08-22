@@ -136,7 +136,6 @@
 
   <div class="sidebar-footer">
     <span class="ver">v0.3.0</span>
-    <span class="local-badge">100% {appState.t('本地', 'Local')}</span>
   </div>
 </nav>
 
@@ -162,7 +161,6 @@
     border: none;
     color: var(--ntx-fg);
     font-size: 13px;
-    outline: none;
   }
   .search::placeholder {
     color: var(--ntx-fg-subtle);

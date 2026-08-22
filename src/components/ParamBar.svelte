@@ -72,7 +72,6 @@
   .param select:focus-visible,
   .param textarea:focus-visible {
     border-color: var(--ntx-primary);
-    outline: none;
   }
   .file-pick {
     display: inline-flex;

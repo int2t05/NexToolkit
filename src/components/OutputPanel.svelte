@@ -69,10 +69,10 @@
 <style>
   .error {
     background: var(--ntx-danger-soft);
-    border: 1px solid var(--ntx-danger);
+    border-left: 3px solid var(--ntx-danger);
     color: var(--ntx-danger);
     padding: var(--ntx-space-3);
-    border-radius: var(--ntx-radius-base);
+    border-radius: var(--ntx-radius-sm);
     font-family: var(--ntx-font-mono);
     white-space: pre-wrap;
   }
@@ -144,10 +144,10 @@
   .output-box {
     display: flex;
     flex-direction: column;
-    background: var(--ntx-bg);
-    border: 1px solid var(--ntx-border);
-    border-radius: var(--ntx-radius-base);
+    background: var(--ntx-surface);
+    border-radius: var(--ntx-radius-lg);
     overflow: hidden;
+    box-shadow: var(--ntx-shadow-md);
   }
   .output-header {
     display: flex;

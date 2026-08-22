@@ -11,13 +11,17 @@ html,
 body {
   margin: 0;
   height: 100%;
+  background: var(--ntx-bg);
 }
 
 body {
   font-family: var(--ntx-font-sans);
-  background: var(--ntx-bg);
   color: var(--ntx-fg);
   -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
 }
 
 ::selection {
@@ -28,6 +32,20 @@ body {
 :focus-visible {
   outline: 2px solid var(--ntx-primary);
   outline-offset: 2px;
+}
+
+/* 输入框焦点:box-shadow ring 替代 outline(配合组件 outline:none) */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--ntx-primary);
+  box-shadow: var(--ntx-focus-ring);
+}
+
+/* 按钮按压反馈(Apple HIG 即时响应) */
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 ::-webkit-scrollbar {
