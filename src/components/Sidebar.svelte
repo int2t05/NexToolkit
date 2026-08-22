@@ -1,10 +1,21 @@
 <script lang="ts">
   import { appState } from '../lib/state.svelte';
-  import { GROUPS, GROUP_LABEL, GROUP_CAT_VAR } from '../lib/types';
+  import { GROUPS, GROUP_LABEL, GROUP_CAT_VAR, SUBGROUPS } from '../lib/types';
+  import type { SubCategory } from '../lib/types';
   import { Search, ChevronDown, ChevronRight, Star, Clock, X } from '@lucide/svelte';
 
   function clearQuery() {
     appState.query = '';
+  }
+
+  /** group 下的子分类(按 SUBGROUPS 顺序) */
+  function subgroupsOf(group: string): SubCategory[] {
+    return SUBGROUPS.filter((s) => s.parent === group);
+  }
+
+  /** 子分类是否选中 */
+  function subgroupActive(subgroupId: string): boolean {
+    return appState.selectedSubgroup === subgroupId;
   }
 </script>
 
@@ -65,15 +76,46 @@
           </span>
         </button>
         {#if expanded}
-          {#each toolsInGroup as tool (tool.id)}
-            <button
-              class="tool-row"
-              class:active={appState.selectedTool?.id === tool.id}
-              onclick={() => appState.openTool(tool)}
-            >
-              <span class="tool-name">{tool.name}</span>
-            </button>
-          {/each}
+          {@const subs = subgroupsOf(g)}
+          {#if subs.length > 0}
+            {#each subs as sub (sub.id)}
+              {@const subTools = toolsInGroup.filter((t) => appState.subgroupOf(t) === sub.id)}
+              {#if subTools.length > 0}
+                <button
+                  class="sub-header"
+                  class:active={subgroupActive(sub.id)}
+                  onclick={() => appState.selectSubgroup(sub.id)}
+                >
+                  <span class="sub-label">{appState.lang === 'zh' ? sub.label.zh : sub.label.en}</span>
+                  <span class="sub-count">{subTools.length}</span>
+                </button>
+              {/if}
+            {/each}
+            <!-- 未归入子分类的工具(兜底) -->
+            {@const ungrouped = toolsInGroup.filter((t) => !appState.subgroupOf(t))}
+            {#if ungrouped.length > 0}
+              {#each ungrouped as tool (tool.id)}
+                <button
+                  class="tool-row"
+                  class:active={appState.selectedTool?.id === tool.id}
+                  onclick={() => appState.openTool(tool)}
+                >
+                  <span class="tool-name">{tool.name}</span>
+                </button>
+              {/each}
+            {/if}
+          {:else}
+            <!-- 无子分类的 group 直接列工具 -->
+            {#each toolsInGroup as tool (tool.id)}
+              <button
+                class="tool-row"
+                class:active={appState.selectedTool?.id === tool.id}
+                onclick={() => appState.openTool(tool)}
+              >
+                <span class="tool-name">{tool.name}</span>
+              </button>
+            {/each}
+          {/if}
         {/if}
       {/if}
     {/each}
@@ -171,6 +213,37 @@
   }
   .group-header:hover {
     background: var(--ntx-surface-2);
+  }
+  .sub-header {
+    display: flex;
+    align-items: center;
+    gap: var(--ntx-space-2);
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--ntx-fg-muted);
+    padding: var(--ntx-space-1) var(--ntx-space-2) var(--ntx-space-1) var(--ntx-space-4);
+    border-radius: var(--ntx-radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background var(--ntx-transition), color var(--ntx-transition);
+  }
+  .sub-header:hover {
+    background: var(--ntx-surface-2);
+    color: var(--ntx-fg);
+  }
+  .sub-header.active {
+    background: var(--ntx-primary-soft);
+    color: var(--ntx-primary);
+    font-weight: 500;
+  }
+  .sub-label {
+    flex: 1;
+    text-align: left;
+  }
+  .sub-count {
+    font-size: 10px;
+    color: var(--ntx-fg-subtle);
   }
   .cat-dot {
     width: 8px;

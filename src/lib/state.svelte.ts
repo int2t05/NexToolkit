@@ -6,6 +6,7 @@ import { invoke } from '../bindings';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import hljs from 'highlight.js';
 import type { ToolMetaDto, EngineStatusDto } from './types';
+import { SUBGROUPS, SUBCATEGORY, BIDIRECTIONAL, MULTI_OUTPUT_SUBGROUPS } from './types';
 import { escapeHtml } from './format';
 
 const FAV_KEY = 'nextoolkit-favorites';
@@ -69,6 +70,12 @@ class AppState {
   // ── 引擎状态(运行时探测)──────────────────────────
   engines = $state<EngineStatusDto[]>([]);
 
+  // ── 工作区(子分类 + tab 切工具 + 模式)──────────────
+  selectedSubgroup = $state<string | null>(null);
+  mode = $state<'encode' | 'decode'>('encode');
+  /** 多结果并出(hash 类):每工具 id → 结果字符串 */
+  multiOutputs = $state<Record<string, string>>({});
+
   // ── 派生 ──────────────────────────────────────────
   filteredTools = $derived.by(() => {
     const q = this.query.trim().toLowerCase();
@@ -92,6 +99,36 @@ class AppState {
   recentTools = $derived.by(() => {
     const byId = new Map(this.tools.map((tool) => [tool.id, tool]));
     return this.recent.map((id) => byId.get(id)).filter((tool): tool is ToolMetaDto => !!tool);
+  });
+
+  /** 工具所属子分类 id(未映射则 null,显在父 group 兜底) */
+  subgroupOf(tool: ToolMetaDto): string | null {
+    return SUBCATEGORY[tool.id] ?? null;
+  }
+
+  /** 子分类下的工具(按 subgroup id 过滤) */
+  toolsInSubgroup(subgroupId: string): ToolMetaDto[] {
+    return this.tools.filter((tool) => SUBCATEGORY[tool.id] === subgroupId);
+  }
+
+  /** 当前选中工具是否双向(有 encode/decode 对) */
+  isBidirectional = $derived.by(() => {
+    const id = this.selectedTool?.id;
+    if (!id) return false;
+    return id in BIDIRECTIONAL || Object.values(BIDIRECTIONAL).includes(id);
+  });
+
+  /** 当前子分类是否多结果并出(hash 类) */
+  isMultiOutput = $derived.by(() => {
+    const sg = this.selectedSubgroup;
+    return sg !== null && MULTI_OUTPUT_SUBGROUPS.has(sg);
+  });
+
+  /** 当前子分类的所有工具(用于多结果并出) */
+  subgroupTools = $derived.by(() => {
+    const sg = this.selectedSubgroup;
+    if (!sg) return [];
+    return this.toolsInSubgroup(sg);
   });
 
   highlightedOutput = $derived.by(() => {
@@ -133,7 +170,7 @@ class AppState {
   }
 
   // ── 工具选择 ──────────────────────────────────────
-  /** 纯选择:设当前工具 + 初始化参数默认值 + 清空输出(不计入最近) */
+  /** 纯选择:设当前工具 + 初始化参数默认值 + 清空输出(mainInput 保留,共享输入区) */
   selectTool(tool: ToolMetaDto) {
     this.selectedTool = tool;
     const defaults: Record<string, string> = {};
@@ -142,7 +179,60 @@ class AppState {
     this.files = {};
     this.output = '';
     this.error = '';
+    this.multiOutputs = {};
     this.paletteOpen = false;
+    // 若示例字典有值且 mainInput 为空,预填示例
+    if (!this.mainInput && EXAMPLES[tool.id]) this.mainInput = EXAMPLES[tool.id];
+  }
+
+  /** 选中子分类:设 selectedSubgroup + 选首个工具 + 设 mode */
+  selectSubgroup(subgroupId: string) {
+    this.selectedSubgroup = subgroupId;
+    const tools = this.toolsInSubgroup(subgroupId);
+    if (tools.length > 0) {
+      this.selectTool(tools[0]);
+      // 双向工具默认 encode 模式
+      this.mode = tools[0].id in BIDIRECTIONAL ? 'encode' : 'encode';
+    }
+    this.paletteOpen = false;
+  }
+
+  /** tab 切工具(同 subgroup 内):保留 mainInput,切 selectedTool */
+  switchTool(tool: ToolMetaDto) {
+    if (this.selectedTool?.id === tool.id) return;
+    this.selectTool(tool);
+  }
+
+  /** 切 encode/decode 模式:切到对应方向工具 + input/output 互换 */
+  switchMode() {
+    const id = this.selectedTool?.id;
+    if (!id) return;
+    const pair = BIDIRECTIONAL[id] ?? Object.entries(BIDIRECTIONAL).find(([, v]) => v === id)?.[0];
+    if (!pair) return;
+    const target = this.tools.find((tool) => tool.id === pair);
+    if (!target) return;
+    // 互换 input/output
+    const prevOutput = this.output;
+    this.selectTool(target);
+    this.mode = target.id in BIDIRECTIONAL ? 'encode' : 'decode';
+    if (prevOutput) this.mainInput = prevOutput;
+  }
+
+  /** Swap:input/output 互换 + 翻转模式(双向工具) */
+  swap() {
+    if (!this.output) return;
+    const prev = this.output;
+    this.output = this.mainInput;
+    this.mainInput = prev;
+    if (this.isBidirectional) this.switchMode();
+  }
+
+  /** 清空输入/输出 */
+  clear() {
+    this.mainInput = '';
+    this.output = '';
+    this.error = '';
+    this.multiOutputs = {};
   }
 
   /** 用户点击打开:选择 + 计入最近(侧栏/面板点击用)。
@@ -204,7 +294,28 @@ class AppState {
     this.loading = true;
     this.error = '';
     this.output = '';
+    this.multiOutputs = {};
     try {
+      // 多结果并出(hash 类):循环该 subgroup 所有文本工具,各调 run_tool
+      if (this.isMultiOutput) {
+        const tools = this.subgroupTools.filter((t) => this.textIds.has(t.id));
+        const results: Record<string, string> = {};
+        await Promise.all(
+          tools.map(async (t) => {
+            const args = t.params
+              .filter((p) => p.kind !== 'file')
+              .map((p) => [p.key, String(this.params[p.key] ?? p.default ?? '')] as [string, string]);
+            try {
+              const r = await invoke<string>('run_tool', { id: t.id, input: this.mainInput, args });
+              results[t.id] = r;
+            } catch (e) {
+              results[t.id] = e instanceof Error ? e.message : String(e);
+            }
+          }),
+        );
+        this.multiOutputs = results;
+        return;
+      }
       let result: unknown;
       if (this.textIds.has(tool.id)) {
         // 文本工具:args 为 Vec<(String,String)>,前端传 [[key,value],...]
@@ -266,5 +377,57 @@ class AppState {
     this.lang = this.lang === 'zh' ? 'en' : 'zh';
   }
 }
+
+// 示例预填字典(首屏不空,选工具时若 mainInput 为空则预填)
+const EXAMPLES: Record<string, string> = {
+  // encode
+  base64_encode: 'Hello NexToolkit',
+  base64_decode: 'SGVsbG8gTmV4VG9vbGtpdA==',
+  base32_encode: 'Hello',
+  base58_encode: 'Hello',
+  base85_encode: 'Man ',
+  url_encode: '你好 world?foo=bar',
+  html_encode: '<a href="#">link & text</a>',
+  hex_encode: 'AABB',
+  jwt_decode: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
+  punycode_encode: 'münchen.de',
+  morse_encode: 'SOS',
+  braille_encode: 'hello',
+  zero_width_encode: 'secret',
+  // convert
+  json_to_yaml: '{"name":"NexToolkit","version":3,"tags":["rust","tauri","svelte"]}',
+  json_to_toml: '{"name":"NexToolkit","version":3}',
+  json_to_csv: '[{"name":"Alice","age":30},{"name":"Bob","age":25}]',
+  numbase_convert: '255',
+  case_convert: 'Hello World Example',
+  md_to_html: '# Title\n\nHello **NexToolkit**\n',
+  unit_convert: '1',
+  // format
+  json_format: '{"b":2,"a":1,"c":[3,2,1]}',
+  sql_format: 'select*from t where a=1 and b=2',
+  // generate
+  hash: 'abc',
+  hmac_compute: 'message',
+  password_generate: '',
+  // text
+  text_stats: 'Hello World\nNexToolkit 本地工具集\n第二行',
+  sort_lines: 'banana\napple\ncherry\nApple',
+  dedup_lines: 'a\nb\na\nc\nb',
+  reverse_text: 'Hello NexToolkit',
+  regex_match: 'a12b3c45',
+  diff_text: 'Hello World\nNexToolkit',
+  text_replace: 'Hello World, Hello NexToolkit',
+  text_escape: "echo 'hello $USER'",
+  // crypto
+  aes_gcm_encrypt: 'Secret message',
+  rsa_sign: 'data to sign',
+  bcrypt_hash: 'password',
+  crc32: '123456789',
+  // nettime
+  ipcalc: '192.168.1.5/24',
+  timestamp_to_human: '1700000000',
+  cron_next: '0 * * * *',
+  http_probe: 'https://example.com',
+};
 
 export const appState = new AppState();
