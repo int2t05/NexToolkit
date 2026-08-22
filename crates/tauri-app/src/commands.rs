@@ -143,7 +143,7 @@ static FILE_TOOLS: &[ToolMeta] = &[
     ToolMeta {
         id: "archive_list",
         name: "归档列表",
-        desc: "列出归档内文件(zip/tar/gz)",
+        desc: "列出归档内文件(zip/tar/gz/7z/bz2/xz/zst)",
         group: "fileconv",
         params: &[ParamSpec {
             key: "path",
@@ -205,7 +205,7 @@ static FILE_TOOLS: &[ToolMeta] = &[
                 kind: ParamKind::Select,
                 label: "格式",
                 default: Some("zip"),
-                options: &["zip", "tar", "targz", "gz", "7z"],
+                options: &["zip", "tar", "targz", "gz", "7z", "bz2", "xz", "zst"],
                 placeholder: None,
                 multiple: false,
             },
@@ -233,7 +233,7 @@ static FILE_TOOLS: &[ToolMeta] = &[
                 kind: ParamKind::Select,
                 label: "目标格式",
                 default: Some("zip"),
-                options: &["zip", "tar", "targz", "gz", "7z"],
+                options: &["zip", "tar", "targz", "gz", "7z", "bz2", "xz", "zst"],
                 placeholder: None,
                 multiple: false,
             },
@@ -598,6 +598,97 @@ static FILE_TOOLS: &[ToolMeta] = &[
         output_kind: OutputKind::Text,
     },
     ToolMeta {
+        id: "font_convert",
+        name: "字体转换",
+        desc: "TTF/OTF↔WOFF 互转",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "字体文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "target",
+                kind: ParamKind::Select,
+                label: "目标格式",
+                default: Some("woff"),
+                options: &["ttf", "woff"],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "font_meta",
+        name: "字体元数据",
+        desc: "查看名称/版权/字重/UPM",
+        group: "fileconv",
+        params: &[ParamSpec {
+            key: "path",
+            kind: ParamKind::File,
+            label: "字体文件",
+            default: None,
+            options: &[],
+            placeholder: None,
+            multiple: false,
+        }],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "svg_convert",
+        name: "SVG 栅格化",
+        desc: "SVG→PNG/JPG(resvg)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "SVG 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "target",
+                kind: ParamKind::Select,
+                label: "目标格式",
+                default: Some("png"),
+                options: &["png", "jpg"],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
         id: "av_convert",
         name: "音视频转换",
         desc: "ffmpeg 转码(音视频格式互转)",
@@ -951,6 +1042,38 @@ pub fn pdf_decrypt(path: String, password: String, output: Option<String>) -> Cm
     Ok(nextool_core::decrypt_pdf(
         &path,
         &password,
+        output.as_deref(),
+    )?)
+}
+
+/// 字体格式互转(默认输出到源文件旁);返回产物路径
+#[tauri::command]
+pub fn font_convert(path: String, target: String, output: Option<String>) -> CmdResult<String> {
+    let fmt = target
+        .parse::<nextool_core::FontFormat>()
+        .map_err(|e| CmdError(e.to_string()))?;
+    Ok(nextool_core::convert_font_file(
+        &path,
+        fmt,
+        output.as_deref(),
+    )?)
+}
+
+/// 读取字体元数据(名称/版权/字重/UPM);返回格式化文本
+#[tauri::command]
+pub fn font_meta(path: String) -> CmdResult<String> {
+    Ok(nextool_core::read_font_meta_file(&path)?)
+}
+
+/// SVG 栅格化为 PNG/JPG(默认输出到源文件旁);返回产物路径
+#[tauri::command]
+pub fn svg_convert(path: String, target: String, output: Option<String>) -> CmdResult<String> {
+    let fmt = target
+        .parse::<nextool_core::SvgFormat>()
+        .map_err(|e| CmdError(e.to_string()))?;
+    Ok(nextool_core::convert_svg_file(
+        &path,
+        fmt,
         output.as_deref(),
     )?)
 }

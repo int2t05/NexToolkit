@@ -8,15 +8,15 @@
 
 | 类别 | freeconvert 规模 | NexToolkit 现状 | 缺口数 |
 |---|---|---|---|
-| 文档转换 | ~30 格式 × N 组合 ≈ 325 对 | 5 对(MD→HTML + JSON↔YAML/TOML/CSV) | ~320 对 |
-| 音视频转换 | 30+ 格式 × N 组合 | 0(⚙ 框架就绪) | ~80 |
-| 图像转换 | 500+ 格式 | 7 格式全互转(42 对)+缩放 | ~450 对(含 RAW 单向) |
-| 电子书转换 | 30+ 转换 | 0(⚙ 框架就绪) | ~25 |
-| PDF 套件 | 15+ 工具 | 4(拆/转/加/解密) | ~20 |
-| 归档转换 | 50+ 转换 | zip/tar/gz/7z 解压 | ~15 |
-| 字体转换 | 6 格式互转 | 0 | ~10 |
-| 矢量转换 | 14+ 格式 | 0 | ~15 |
-| 编码/文本/加密/时间 | — | 54 工具已交付 | 补充 ~10 |
+| 文档转换 | ~30 格式 × N 组合 ≈ 325 对 | 15 对(MD→HTML/TXT + JSON↔YAML/TOML/CSV/XML + CSV↔TSV/YAML/XML + TSV↔JSON + YAML↔TOML/XML + TOML↔XML + PDF/DOCX→TXT) | ~310 对 |
+| 音视频转换 | 30+ 格式 × N 组合 | 6 引擎接线(ffmpeg 通用) | ~80 |
+| 图像转换 | 500+ 格式 | 14 格式互转(98 对)+ 裁剪/翻转/滤镜/亮度/JPEG压缩 | ~390 对(含 RAW 单向) |
+| 电子书转换 | 30+ 转换 | 6 引擎接线(calibre 通用) | ~25 |
+| PDF 套件 | 15+ 工具 | 5(拆/转90/180/270/加/解密)+ 压缩(ghostscript) | ~15 |
+| 归档转换 | 50+ 转换 | zip/tar/gz/7z + bz2/xz/zst | ~10 |
+| 字体转换 | 6 格式互转 | 3(TTF↔WOFF + 元数据) | ~7 |
+| 矢量转换 | 14+ 格式 | 2(SVG→PNG/JPG) | ~13 |
+| 编码/文本/加密/时间 | — | 70 工具(含 16 编码新工具) | 补充 ~2 |
 
 **缺口总计:~945 对/项**(含互转对;不含已交付 54 工具)。下文逐类展开,含 N×M 互转矩阵。
 
@@ -65,7 +65,7 @@
 | D-14 | PDF → DOCX(PDF to Word,文本+布局) | LibreOffice ⚙ / pdf-extract | ☐ ⚙ |
 | D-15 | PDF → XLSX(PDF to Excel,表格识别) | LibreOffice ⚙ / tabula-rs | ☐ ⚙ |
 | D-16 | PDF → PPTX | LibreOffice ⚙ | ☐ ⚙ |
-| D-17 | PDF → TXT(纯文本提取) | lopdf(纯 Rust) | ☐ |
+| D-17 | PDF → TXT(纯文本提取) | lopdf(纯 Rust) | ✓ |
 | D-18 | PDF → RTF | LibreOffice ⚙ | ☐ ⚙ |
 | D-19 | PDF → ODT | LibreOffice ⚙ | ☐ ⚙ |
 
@@ -79,7 +79,7 @@
 | D-21 | DOCX ↔ ODT | LibreOffice ⚙ | ☐ ⚙ |
 | D-22 | DOCX ↔ RTF | LibreOffice ⚙ / docx-rs | ☐ ⚙ |
 | D-23 | DOCX ↔ HTML | LibreOffice ⚙ / pandoc | ☐ ⚙ |
-| D-24 | DOCX ↔ TXT | 纯 Rust(zip+quick-xml 提文本) | ☐ |
+| D-24 | DOCX → TXT | 纯 Rust(zip+quick-xml) | ✓ |
 | D-25 | DOC ↔ ODT | LibreOffice ⚙ | ☐ ⚙ |
 | D-26 | DOC ↔ RTF | LibreOffice ⚙ | ☐ ⚙ |
 | D-27 | DOC ↔ HTML | LibreOffice ⚙ | ☐ ⚙ |
@@ -107,17 +107,17 @@
 | D-42 | XLS ↔ ODS | LibreOffice ⚙ | ☐ ⚙ |
 | D-43 | ODS ↔ CSV | LibreOffice ⚙ / 纯 Rust | ☐ ⚙ |
 | D-44 | ODS ↔ TSV | LibreOffice ⚙ | ☐ ⚙ |
-| D-45 | CSV ↔ TSV | 纯 Rust(分隔符替换) | ☐ |
+| D-45 | CSV ↔ TSV | 纯 Rust(分隔符替换) | ✓ |
 | D-46 | CSV ↔ JSON | ✓ 已交付(core) | ✓ |
-| D-47 | CSV ↔ YAML | 纯 Rust(经 json 中转) | ☐ |
-| D-48 | CSV ↔ XML | 纯 Rust | ☐ |
-| D-49 | TSV ↔ JSON | 纯 Rust | ☐ |
+| D-47 | CSV ↔ YAML | 纯 Rust(经 json 中转) | ✓ |
+| D-48 | CSV ↔ XML | 纯 Rust | ✓ |
+| D-49 | TSV ↔ JSON | 纯 Rust | ✓ |
 | D-50 | JSON ↔ YAML | ✓ 已交付 | ✓ |
 | D-51 | JSON ↔ TOML | ✓ 已交付 | ✓ |
-| D-52 | JSON ↔ XML | 纯 Rust(quick-xml 已有) | ☐ |
-| D-53 | YAML ↔ TOML | 纯 Rust(经 json 中转) | ☐ |
-| D-54 | YAML ↔ XML | 纯 Rust | ☐ |
-| D-55 | TOML ↔ XML | 纯 Rust | ☐ |
+| D-52 | JSON ↔ XML | 纯 Rust(quick-xml) | ✓ |
+| D-53 | YAML ↔ TOML | 纯 Rust(经 json 中转) | ✓ |
+| D-54 | YAML ↔ XML | 纯 Rust | ✓ |
+| D-55 | TOML ↔ XML | 纯 Rust | ✓ |
 | D-56 | JSON ↔ XLSX | rust_xlsxwriter | ☐ |
 
 ### 1.5 演示文稿互转(N×M)
@@ -146,7 +146,7 @@
 | D-65 | **MD ↔ HTML** | ✓ 已交付(pulldown-cmark) | ✓ |
 | D-66 | MD → PDF(MD→HTML→PDF 链路) | pandoc ⚙ / printpdf(纯 Rust) | ☐ |
 | D-67 | MD → DOCX | pandoc ⚙ / docx-rs(纯 Rust) | ☐ ⚙ |
-| D-68 | MD → TXT(去标记) | 纯 Rust(pulldown-cmark 提纯文本) | ☐ |
+| D-68 | MD → TXT(去标记) | pulldown-cmark | ✓ |
 | D-69 | MD → RST | pandoc ⚙ | ☐ ⚙ |
 | D-70 | MD → AsciiDoc(.adoc) | pandoc ⚙ | ☐ ⚙ |
 | D-71 | MD → Org | pandoc ⚙ | ☐ ⚙ |
@@ -505,14 +505,14 @@
 | R-03 | RAR → ZIP | unrar + zip | ☐ |
 | R-04 | RAR → 7Z | unrar + sevenz-rust2 | ☐ |
 | R-05 | RAR → TAR | unrar + tar | ☐ |
-| R-06 | BZ2 解压/压缩 | bzip2 crate | ☐ |
+| R-06 | BZ2 解压/压缩 | bzip2 crate | ✓ |
 | R-07 | BZ2 → ZIP | bzip2 + zip | ☐ |
 | R-08 | TAR.BZ2 ↔ ZIP | tar + bzip2 | ☐ |
-| R-09 | XZ 解压/压缩 | xz2 crate | ☐ |
+| R-09 | XZ 解压/压缩 | xz2 crate | ✓ |
 | R-10 | LZMA 解压 | xz2 | ☐ |
 | R-11 | CAB 解压(Windows 安装包) | cab crate | ☐ |
 | R-12 | ISO 解压(光盘镜像) | iso9660 / pure Rust | ☐ |
-| R-13 | Zstandard 解压/压缩 | zstd crate | ☐ |
+| R-13 | Zstandard 解压/压缩 | zstd crate | ✓ |
 
 ### 6.2 归档操作
 
@@ -536,12 +536,12 @@
 | # | 转换 | 依赖 | 状态 |
 |---|---|---|---|
 | F-01 | TTF → OTF | 纯 Rust(ttf-parser + write) | ☐ |
-| F-02 | TTF → WOFF | woff crate | ☐ |
+| F-02 | TTF → WOFF | 纯 Rust(flate2 包装) | ✓ |
 | F-03 | TTF → WOFF2 | woff2 crate / Brotli | ☐ |
 | F-04 | OTF → WOFF | woff crate | ☐ |
 | F-05 | OTF → WOFF2 | woff2 | ☐ |
 | F-06 | WOFF → WOFF2 | woff + woff2 | ☐ |
-| F-07 | WOFF2 → TTF | woff2 解码 | ☐ |
+| F-07 | WOFF → TTF | 纯 Rust | ✓ |
 | F-08 | EOT → TTF | 纯 Rust(EOT 解析简单) | ☐ |
 | F-09 | EOT → WOFF | EOT + woff | ☐ |
 | F-10 | SVG 字体 → TTF | fontTools / potrace | ☐ ⚙ |
@@ -550,7 +550,7 @@
 
 | # | 功能 | 状态 |
 |---|---|---|
-| F-11 | 字体元数据查看(名称/版权/字重) | ☐ |
+| F-11 | 字体元数据查看(名称/版权/字重) | ✓ |
 | F-12 | 字体子集化(精简字形) | ☐ |
 
 ---
@@ -561,8 +561,8 @@
 
 | # | 转换 | 依赖 | 状态 |
 |---|---|---|---|
-| VC-01 | SVG → PNG(栅格化) | resvg | ☐ |
-| VC-02 | SVG → JPG | resvg + image | ☐ |
+| VC-01 | SVG → PNG(栅格化) | resvg | ✓ |
+| VC-02 | SVG → JPG | resvg + image | ✓ |
 | VC-03 | SVG → PDF | resvg + printpdf | ☐ |
 | VC-04 | EMF → PNG | libemf(C 绑定) | ☐ |
 | VC-05 | EMF → SVG | libemf | ☐ |

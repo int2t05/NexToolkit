@@ -62,11 +62,14 @@ hickory-resolver = "0.24"
 # http(纯 Rust TLS,无 OpenSSL)
 ureq = { version = "2", features = ["tls"] }
 
-# fileconv — archive(feature-gated)
+# fileconv — archive(feature-gated):ZIP/TAR/GZ/7Z + BZ2/XZ/ZST 单文件压缩
 zip = { version = "2", optional = true }
 tar = { version = "0.4", optional = true }
 flate2 = { version = "1", optional = true }
 sevenz-rust2 = { version = "0.21", optional = true }
+bzip2 = { version = "0.6", optional = true }
+xz2 = { version = "0.1", optional = true }
+zstd = { version = "0.13", optional = true }
 
 # fileconv — image(feature-gated):栅格格式(7 基础 + 7 扩展,DDS 仅解码)
 image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "tiff", "ico", "dds", "ff", "hdr", "exr", "pnm", "qoi", "tga"] }
@@ -74,8 +77,16 @@ image = { version = "0.25", optional = true, default-features = false, features 
 # fileconv — pdf(feature-gated):lopdf 默认关闭重依赖(rayon/jiff/image/serde)
 lopdf = { version = "0.44", optional = true, default-features = false }
 
+# fileconv — font(feature-gated):ttf-parser 读 name 表 + flate2 做 WOFF zlib 包装
+ttf-parser = { version = "0.25", optional = true }
+
+# fileconv — svg(feature-gated):resvg 栅格化(重导出 usvg/tiny-skia)+ image 编码 JPG
+resvg = { version = "0.48", optional = true }
+
 [features]
-default = ["archive", "image", "pdf"]
-archive = ["dep:zip", "dep:tar", "dep:flate2", "dep:sevenz-rust2"]
+default = ["archive", "image", "pdf", "font", "svg"]
+archive = ["dep:zip", "dep:tar", "dep:flate2", "dep:sevenz-rust2", "dep:bzip2", "dep:xz2", "dep:zstd"]
 image = ["dep:image"]
 pdf = ["dep:lopdf"]
+font = ["dep:ttf-parser", "dep:flate2"]
+svg = ["dep:resvg", "image"]

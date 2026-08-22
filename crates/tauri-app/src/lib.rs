@@ -7,9 +7,10 @@ mod commands;
 
 use commands::{
     archive_compress, archive_convert, archive_extract, archive_list, av_convert, ebook_convert,
-    image_adjust, image_compress_jpeg, image_convert, image_crop, image_filter, image_flip,
-    image_resize, list_engines, list_file_tools, list_tools, markup_convert, ocr, office_to_pdf,
-    pdf_compress, pdf_decrypt, pdf_encrypt, pdf_rotate, pdf_split, run_tool,
+    font_convert, font_meta, image_adjust, image_compress_jpeg, image_convert, image_crop,
+    image_filter, image_flip, image_resize, list_engines, list_file_tools, list_tools,
+    markup_convert, ocr, office_to_pdf, pdf_compress, pdf_decrypt, pdf_encrypt, pdf_rotate,
+    pdf_split, run_tool, svg_convert,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -38,6 +39,11 @@ pub fn run() {
             pdf_rotate,
             pdf_encrypt,
             pdf_decrypt,
+            // 字体转换
+            font_convert,
+            font_meta,
+            // SVG 栅格化
+            svg_convert,
             // 引擎转换(运行时探测系统已装引擎)
             av_convert,
             office_to_pdf,

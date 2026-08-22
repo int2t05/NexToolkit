@@ -30,10 +30,44 @@ enum FileConvCmd {
         #[command(subcommand)]
         cmd: PdfCmd,
     },
+    /// 字体操作:TTF↔WOFF 转换/元数据查看
+    Font {
+        #[command(subcommand)]
+        cmd: FontCmd,
+    },
+    /// SVG 栅格化:SVG→PNG/JPG
+    Svg {
+        #[command(subcommand)]
+        cmd: SvgCmd,
+    },
     /// 引擎转换:音视频/Office/电子书/标记/PDF压缩/OCR(运行时探测系统已装引擎)
     Engine {
         #[command(subcommand)]
         cmd: EngineCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum FontCmd {
+    /// 字体格式互转(ttf↔woff)
+    Convert {
+        input: String,
+        target: nextool_core::FontFormat,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 查看字体元数据(名称/版权/字重/UPM)
+    Meta { input: String },
+}
+
+#[derive(Subcommand)]
+enum SvgCmd {
+    /// SVG 栅格化为位图(--target png/jpg)
+    Convert {
+        input: String,
+        target: nextool_core::SvgFormat,
+        #[arg(long)]
+        output: Option<String>,
     },
 }
 
@@ -363,6 +397,35 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 let out = nextool_core::decrypt_pdf(&input, &password, output.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已解密 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Font { cmd } => match cmd {
+            FontCmd::Convert {
+                input,
+                target,
+                output,
+            } => {
+                let out = nextool_core::convert_font_file(&input, target, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            FontCmd::Meta { input } => {
+                let text = nextool_core::read_font_meta_file(&input).map_err(|e| e.to_string())?;
+                println!("{text}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Svg { cmd } => match cmd {
+            SvgCmd::Convert {
+                input,
+                target,
+                output,
+            } => {
+                let out = nextool_core::convert_svg_file(&input, target, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已栅格化 {out}");
                 Ok(())
             }
         },

@@ -128,6 +128,9 @@ fn archive_ext(fmt: ArchiveFormat) -> &'static str {
         ArchiveFormat::TarGz => "tar.gz",
         ArchiveFormat::Gz => "gz",
         ArchiveFormat::SevenZ => "7z",
+        ArchiveFormat::Bz2 => "bz2",
+        ArchiveFormat::Xz => "xz",
+        ArchiveFormat::Zst => "zst",
     }
 }
 
@@ -301,6 +304,48 @@ pub fn decrypt_pdf(input: &str, password: &str, output: Option<&str>) -> ToolRes
 pub fn is_pdf_encrypted_file(path: &str) -> ToolResult<bool> {
     let data = std::fs::read(path)?;
     super::pdf_is_encrypted(&data)
+}
+
+// ---- 字体 IO(font feature)----
+
+#[cfg(feature = "font")]
+use super::font::FontFormat;
+
+/// 字体格式互转并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "font")]
+pub fn convert_font_file(
+    input: &str,
+    target: FontFormat,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::font_convert(&data, target)?;
+    write_output(&out_data, input, output, target.ext())
+}
+
+/// 读取字体文件元数据(读盘 → 调纯 font_metadata → 格式化文本)
+#[cfg(feature = "font")]
+pub fn read_font_meta_file(input: &str) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let meta = super::font_metadata(&data)?;
+    Ok(super::font_meta_to_text(&meta))
+}
+
+// ---- SVG IO(svg feature)----
+
+#[cfg(feature = "svg")]
+use super::svg::SvgFormat;
+
+/// SVG 栅格化并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "svg")]
+pub fn convert_svg_file(
+    input: &str,
+    target: SvgFormat,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::svg_render(&data, target)?;
+    write_output(&out_data, input, output, target.ext())
 }
 
 // ---- 引擎 IO ----

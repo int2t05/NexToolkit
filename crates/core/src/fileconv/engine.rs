@@ -74,20 +74,28 @@ impl Engine {
     pub fn convert_args(&self, input: &str, output: &str) -> Vec<String> {
         match self {
             Engine::Ffmpeg => vec!["-i".into(), input.into(), "-y".into(), output.into()],
-            Engine::LibreOffice => vec![
-                "--headless".into(),
-                "--convert-to".into(),
-                std::path::Path::new(output)
-                    .extension()
-                    .map(|e| e.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "pdf".into()),
-                "--outdir".into(),
-                std::path::Path::new(output)
-                    .parent()
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| ".".into()),
-                input.into(),
-            ],
+            Engine::LibreOffice => {
+                // -env:UserInstallation 指向临时配置目录,跳过首次运行的用户配置/许可弹窗
+                let profile =
+                    std::env::temp_dir().join(format!("nextool_lo_{}", std::process::id()));
+                let user_inst = format!("file://{}", profile.to_string_lossy());
+                vec![
+                    "--headless".into(),
+                    "-env:UserInstallation".into(),
+                    user_inst,
+                    "--convert-to".into(),
+                    std::path::Path::new(output)
+                        .extension()
+                        .map(|e| e.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "pdf".into()),
+                    "--outdir".into(),
+                    std::path::Path::new(output)
+                        .parent()
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| ".".into()),
+                    input.into(),
+                ]
+            }
             Engine::Calibre => vec![input.into(), output.into()],
             Engine::Pandoc => vec![input.into(), "-o".into(), output.into()],
             Engine::Ghostscript => vec![
@@ -229,9 +237,10 @@ mod tests {
     #[test]
     fn libreoffice_convert_args_extract_format() {
         let args = Engine::LibreOffice.convert_args("in.docx", "/tmp/out.pdf");
-        // --convert-to 应取 output 扩展名 pdf
+        // --convert-to 应取 output 扩展名 pdf;-env:UserInstallation 跳过首次弹窗
         assert!(args.contains(&"pdf".to_string()));
         assert!(args.contains(&"--headless".to_string()));
+        assert!(args.iter().any(|a| a == "-env:UserInstallation"));
     }
 
     #[test]
