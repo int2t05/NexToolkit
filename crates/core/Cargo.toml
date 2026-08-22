@@ -44,7 +44,7 @@ similar = "2.5"
 
 # crypto
 aes-gcm = "0.10"
-rsa = "0.9"
+rsa = { version = "0.9", features = ["sha2"] }
 argon2 = "0.5"
 pbkdf2 = { version = "0.12", features = ["std", "hmac"] }
 
@@ -54,3 +54,6 @@ chrono = { version = "0.4", features = ["serde", "clock"] }
 chrono-tz = "0.10"
 cron = "0.12"
 hickory-resolver = "0.24"
+
+# http(纯 Rust TLS,无 OpenSSL)
+ureq = { version = "2", features = ["tls"] }

@@ -34,6 +34,8 @@ enum NetTimeCmd {
     },
     /// DNS 查询:A/AAAA/MX/TXT
     Dns { rtype: String, domain: String },
+    /// HTTP 探测:URL 状态码与响应头
+    Http { url: String },
 }
 
 pub fn run(args: NetTimeArgs) -> Result<(), String> {
@@ -68,6 +70,10 @@ pub fn run(args: NetTimeArgs) -> Result<(), String> {
                 "{}",
                 nextool_core::dns_lookup(&domain, &rtype).map_err(|e| e.to_string())?
             );
+        }
+        NetTimeCmd::Http { url } => {
+            let probe = nextool_core::http_probe(&url).map_err(|e| e.to_string())?;
+            println!("{}", probe.to_display());
         }
     }
     Ok(())

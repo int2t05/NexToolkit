@@ -76,6 +76,68 @@ pub fn jwt_decode(input: &str) -> ToolResult<String> {
     Ok(serde_json::to_string_pretty(&output)?)
 }
 
+/// JWT 验签:校验 header.payload 段的签名,支持 HS256(HMAC,secret)与 RS256(RSA,公钥 PEM)
+///
+/// `key` 为 HS256 的 secret 字符串或 RS256 的公钥 PEM。验签通过返回 payload 的 pretty JSON,
+/// 失败(签名错/alg 不支持/key 错)返回 Err。
+pub fn jwt_verify(input: &str, key: &str) -> ToolResult<String> {
+    use base64::Engine;
+    use serde_json::Value;
+
+    let parts: Vec<&str> = input.split('.').collect();
+    if parts.len() != 3 {
+        return Err(ToolError::InvalidInput(
+            "JWT 格式错误:应为 header.payload.signature 三段".into(),
+        ));
+    }
+
+    let header_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(parts[0])?;
+    let header: Value = serde_json::from_slice(&header_bytes)?;
+    let alg = header
+        .get("alg")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| ToolError::InvalidInput("JWT header 缺 alg 字段".into()))?;
+
+    // 签名输入:header.payload(前两段,含点)
+    let signing_input = format!("{}.{}", parts[0], parts[1]);
+    let signature = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(parts[2])?;
+
+    match alg {
+        "HS256" => {
+            use hmac::{Hmac, Mac};
+            use sha2::Sha256;
+            type HmacSha256 = Hmac<Sha256>;
+            let mut mac = HmacSha256::new_from_slice(key.as_bytes())
+                .map_err(|e| ToolError::Other(e.to_string()))?;
+            mac.update(signing_input.as_bytes());
+            mac.verify_slice(&signature)
+                .map_err(|_| ToolError::InvalidInput("JWT 签名验证失败".into()))?;
+        }
+        "RS256" => {
+            use rsa::pkcs1v15::VerifyingKey;
+            use rsa::signature::Verifier;
+            use sha2::Sha256;
+            let pub_key = crate::crypto::parse_rsa_public_key(key)?;
+            let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
+            let signature = rsa::pkcs1v15::Signature::try_from(signature.as_slice())
+                .map_err(|e| ToolError::InvalidInput(format!("无效签名: {e}")))?;
+            verifying_key
+                .verify(signing_input.as_bytes(), &signature)
+                .map_err(|_| ToolError::InvalidInput("JWT 签名验证失败".into()))?;
+        }
+        other => {
+            return Err(ToolError::InvalidInput(format!(
+                "不支持的 JWT 算法: {other}(仅 HS256/RS256)"
+            )));
+        }
+    }
+
+    // 验签通过,返回 payload pretty JSON
+    let payload_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(parts[1])?;
+    let payload: Value = serde_json::from_slice(&payload_bytes)?;
+    Ok(serde_json::to_string_pretty(&payload)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -278,5 +340,107 @@ mod tests {
     fn jwt_decode_invalid_json() {
         // "abc" 的 base64url-no-pad 为 YWJj,解码后非合法 JSON
         assert!(jwt_decode("YWJj.eyJzdWIiOiIxIn0.sig").is_err());
+    }
+
+    // ---- jwt_verify ----
+
+    /// 构造 HS256 JWT:header.payload 用 base64url 编码,签名用 HMAC-SHA256
+    fn make_hs256_jwt(header_json: &str, payload_json: &str, secret: &str) -> String {
+        use base64::Engine;
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        type HmacSha256 = Hmac<Sha256>;
+        let header_b64 =
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(header_json.as_bytes());
+        let payload_b64 =
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload_json.as_bytes());
+        let signing_input = format!("{header_b64}.{payload_b64}");
+        let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(signing_input.as_bytes());
+        let sig = mac.finalize().into_bytes();
+        let sig_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sig);
+        format!("{signing_input}.{sig_b64}")
+    }
+
+    #[test]
+    fn jwt_verify_hs256_valid() {
+        let jwt = make_hs256_jwt(r#"{"alg":"HS256","typ":"JWT"}"#, r#"{"sub":"1"}"#, "secret");
+        let payload = jwt_verify(&jwt, "secret").unwrap();
+        let v: serde_json::Value = serde_json::from_str(&payload).unwrap();
+        assert_eq!(v["sub"], "1");
+    }
+
+    #[test]
+    fn jwt_verify_hs256_wrong_secret_fails() {
+        let jwt = make_hs256_jwt(r#"{"alg":"HS256","typ":"JWT"}"#, r#"{"sub":"1"}"#, "right");
+        assert!(jwt_verify(&jwt, "wrong").is_err());
+    }
+
+    #[test]
+    fn jwt_verify_hs256_tampered_payload_fails() {
+        let jwt = make_hs256_jwt(r#"{"alg":"HS256","typ":"JWT"}"#, r#"{"sub":"1"}"#, "secret");
+        // 篡改 payload 段(替换为另一合法 base64url)
+        let parts: Vec<&str> = jwt.split('.').collect();
+        let tampered = format!("{}.{}.{}", parts[0], "eyJzdWIiOiI5In0", parts[2]); // sub=9
+        assert!(
+            jwt_verify(&tampered, "secret").is_err(),
+            "篡改 payload 应验签失败"
+        );
+    }
+
+    #[test]
+    fn jwt_verify_rs256_valid() {
+        let pem = crate::crypto::rsa_keygen(2048).unwrap();
+        let pub_pem = extract_pub_pem(&pem);
+        let priv_pem = extract_priv_pem(&pem);
+        // 构造 RS256 JWT
+        use base64::Engine;
+        use rsa::pkcs1v15::SigningKey;
+        use rsa::signature::{RandomizedSigner, SignatureEncoding};
+        use sha2::Sha256;
+        let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(br#"{"alg":"RS256","typ":"JWT"}"#);
+        let payload_b64 =
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(br#"{"sub":"abc"}"#);
+        let signing_input = format!("{header_b64}.{payload_b64}");
+        let priv_key = crate::crypto::parse_rsa_private_key(&priv_pem).unwrap();
+        let signing_key = SigningKey::<Sha256>::new(priv_key);
+        let mut rng = rand::rngs::OsRng;
+        let sig = signing_key.sign_with_rng(&mut rng, signing_input.as_bytes());
+        let sig_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sig.to_bytes());
+        let jwt = format!("{signing_input}.{sig_b64}");
+
+        let payload = jwt_verify(&jwt, &pub_pem).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&payload).unwrap();
+        assert_eq!(v["sub"], "abc");
+    }
+
+    #[test]
+    fn jwt_verify_unsupported_alg_rejected() {
+        let jwt = make_hs256_jwt(r#"{"alg":"none","typ":"JWT"}"#, r#"{"sub":"1"}"#, "secret");
+        assert!(jwt_verify(&jwt, "secret").is_err(), "alg=none 应不支持");
+    }
+
+    #[test]
+    fn jwt_verify_invalid_format_rejected() {
+        assert!(jwt_verify("not.a.jwt.extra", "secret").is_err());
+        assert!(jwt_verify("onlyone", "secret").is_err());
+    }
+
+    /// 测试辅助:从 keygen 输出提取公钥 PEM 块
+    fn extract_pub_pem(keygen: &str) -> String {
+        let begin = "-----BEGIN RSA PUBLIC KEY-----";
+        let end = "-----END RSA PUBLIC KEY-----";
+        let s = keygen.find(begin).expect("含公钥块");
+        let e = keygen.find(end).expect("含公钥结束") + end.len();
+        keygen[s..e].to_string()
+    }
+
+    fn extract_priv_pem(keygen: &str) -> String {
+        let begin = "-----BEGIN RSA PRIVATE KEY-----";
+        let end = "-----END RSA PRIVATE KEY-----";
+        let s = keygen.find(begin).expect("含私钥块");
+        let e = keygen.find(end).expect("含私钥结束") + end.len();
+        keygen[s..e].to_string()
     }
 }

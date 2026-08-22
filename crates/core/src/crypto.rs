@@ -104,7 +104,7 @@ pub fn rsa_keygen(bits: usize) -> ToolResult<String> {
 
 /// 解析 RSA 公钥 PEM,兼容 PKCS#8/SPKI(`-----BEGIN PUBLIC KEY-----`)
 /// 与 PKCS#1(`-----BEGIN RSA PUBLIC KEY-----`)两种格式
-fn parse_rsa_public_key(pem: &str) -> ToolResult<RsaPublicKey> {
+pub(crate) fn parse_rsa_public_key(pem: &str) -> ToolResult<RsaPublicKey> {
     use rsa::pkcs1::DecodeRsaPublicKey;
     use rsa::pkcs8::DecodePublicKey;
     if let Ok(key) = RsaPublicKey::from_public_key_pem(pem) {
@@ -116,7 +116,7 @@ fn parse_rsa_public_key(pem: &str) -> ToolResult<RsaPublicKey> {
 
 /// 解析 RSA 私钥 PEM,兼容 PKCS#8(`-----BEGIN PRIVATE KEY-----`)
 /// 与 PKCS#1(`-----BEGIN RSA PRIVATE KEY-----`)两种格式
-fn parse_rsa_private_key(pem: &str) -> ToolResult<RsaPrivateKey> {
+pub(crate) fn parse_rsa_private_key(pem: &str) -> ToolResult<RsaPrivateKey> {
     use rsa::pkcs1::DecodeRsaPrivateKey;
     use rsa::pkcs8::DecodePrivateKey;
     if let Ok(key) = RsaPrivateKey::from_pkcs8_pem(pem) {
@@ -144,6 +144,35 @@ pub fn rsa_decrypt(b64: &str, priv_pem: &str) -> ToolResult<String> {
         .decrypt(Oaep::new::<Sha256>(), &ciphertext)
         .map_err(|e| ToolError::Other(e.to_string()))?;
     String::from_utf8(plaintext).map_err(ToolError::from)
+}
+
+/// RSA-PKCS1v15-SHA256 签名:私钥对输入签名,返回 base64 签名
+pub fn rsa_sign(input: &str, priv_pem: &str) -> ToolResult<String> {
+    use rsa::pkcs1v15::SigningKey;
+    use rsa::signature::{RandomizedSigner, SignatureEncoding};
+
+    let priv_key = parse_rsa_private_key(priv_pem)?;
+    let signing_key = SigningKey::<Sha256>::new(priv_key);
+    let mut rng = OsRng;
+    let signature = signing_key.sign_with_rng(&mut rng, input.as_bytes());
+    Ok(base64::engine::general_purpose::STANDARD.encode(signature.to_bytes()))
+}
+
+/// RSA-PKCS1v15-SHA256 验签:公钥验证 input 与 base64 签名是否匹配
+///
+/// 验证成功返回 Ok(()),签名错误或公钥不匹配返回 Err。
+pub fn rsa_verify(input: &str, pub_pem: &str, signature_b64: &str) -> ToolResult<()> {
+    use rsa::pkcs1v15::VerifyingKey;
+    use rsa::signature::Verifier;
+
+    let pub_key = parse_rsa_public_key(pub_pem)?;
+    let signature_bytes = base64::engine::general_purpose::STANDARD.decode(signature_b64.trim())?;
+    let signature = rsa::pkcs1v15::Signature::try_from(signature_bytes.as_slice())
+        .map_err(|e| ToolError::InvalidInput(format!("无效签名: {e}")))?;
+    let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
+    verifying_key
+        .verify(input.as_bytes(), &signature)
+        .map_err(|_| ToolError::InvalidInput("签名验证失败".into()))
 }
 
 // KDF
@@ -272,6 +301,58 @@ mod tests {
     fn rsa_invalid_pem_rejected() {
         assert!(rsa_encrypt("x", "not a pem").is_err());
         assert!(rsa_encrypt("x", "").is_err());
+    }
+
+    // ---- RSA 签名/验签 ----
+
+    #[test]
+    fn rsa_sign_verify_roundtrip() {
+        let pem = rsa_keygen(2048).unwrap();
+        let priv_pem = priv_pem_block(&pem);
+        let pub_pem = pub_pem_block(&pem);
+        for msg in ["hello", "NexToolkit 签名测试", "x"] {
+            let sig = rsa_sign(msg, &priv_pem).unwrap();
+            assert!(
+                rsa_verify(msg, &pub_pem, &sig).is_ok(),
+                "正确签名应验证通过"
+            );
+        }
+    }
+
+    #[test]
+    fn rsa_verify_wrong_message_fails() {
+        let pem = rsa_keygen(2048).unwrap();
+        let priv_pem = priv_pem_block(&pem);
+        let pub_pem = pub_pem_block(&pem);
+        let sig = rsa_sign("original", &priv_pem).unwrap();
+        assert!(
+            rsa_verify("tampered", &pub_pem, &sig).is_err(),
+            "篡改消息应验签失败"
+        );
+    }
+
+    #[test]
+    fn rsa_verify_wrong_key_fails() {
+        let k1 = rsa_keygen(2048).unwrap();
+        let k2 = rsa_keygen(2048).unwrap();
+        let sig = rsa_sign("data", &priv_pem_block(&k1)).unwrap();
+        // 用 k2 的公钥验 k1 的签名,应失败
+        assert!(rsa_verify("data", &pub_pem_block(&k2), &sig).is_err());
+    }
+
+    #[test]
+    fn rsa_sign_invalid_pem_rejected() {
+        assert!(rsa_sign("x", "not a pem").is_err());
+        assert!(rsa_verify("x", "not a pem", "sig").is_err());
+    }
+
+    #[test]
+    fn rsa_verify_invalid_signature_rejected() {
+        let pem = rsa_keygen(2048).unwrap();
+        let pub_pem = pub_pem_block(&pem);
+        // 非法 base64 / 长度错误的签名
+        assert!(rsa_verify("x", &pub_pem, "!!!!").is_err());
+        assert!(rsa_verify("x", &pub_pem, "AAAA").is_err());
     }
 
     // ---- PBKDF2-HMAC-SHA256 ----

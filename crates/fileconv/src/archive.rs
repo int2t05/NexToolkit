@@ -13,6 +13,7 @@ pub enum ArchiveFormat {
     Tar,
     TarGz,
     Gz,
+    SevenZ,
 }
 
 /// 归档条目:归档内相对路径 + 文件内容(纯 gz 单文件时 path 为空串)
@@ -25,10 +26,13 @@ pub struct ArchiveEntry {
 /// 检测归档格式(魔术字节路由)
 ///
 /// ZIP: `50 4B 03 04`;GZ: `1F 8B`(tar.gz 与纯 gz 统一标 Gz,解压时再分);
-/// TAR: `ustar` @ offset 257。无法识别返回 `InvalidInput`。
+/// 7Z: `37 7A BC AF 27 1C`;TAR: `ustar` @ offset 257。无法识别返回 `InvalidInput`。
 pub fn detect_archive_format(data: &[u8]) -> ToolResult<ArchiveFormat> {
     if data.len() >= 4 && data[0..4] == [0x50, 0x4B, 0x03, 0x04] {
         return Ok(ArchiveFormat::Zip);
+    }
+    if data.len() >= 6 && data[0..6] == [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C] {
+        return Ok(ArchiveFormat::SevenZ);
     }
     if data.len() >= 2 && data[0] == 0x1F && data[1] == 0x8B {
         return Ok(ArchiveFormat::Gz);
@@ -79,6 +83,7 @@ pub fn archive_extract_as(data: &[u8], format: ArchiveFormat) -> ToolResult<Vec<
                 data: decompressed,
             }])
         }
+        ArchiveFormat::SevenZ => sevenz_extract(data),
     }
 }
 
@@ -106,6 +111,7 @@ pub fn archive_create(entries: &[ArchiveEntry], format: ArchiveFormat) -> ToolRe
             }
             gz_compress(&entries[0].data)
         }
+        ArchiveFormat::SevenZ => Err(ToolError::InvalidInput("7z 创建暂不支持(仅解压)".into())),
     }
 }
 
@@ -124,6 +130,7 @@ fn extract_auto(data: &[u8]) -> ToolResult<(ArchiveFormat, Vec<ArchiveEntry>)> {
     match detect_archive_format(data)? {
         ArchiveFormat::Zip => Ok((ArchiveFormat::Zip, zip_extract(data)?)),
         ArchiveFormat::Tar => Ok((ArchiveFormat::Tar, tar_extract(data)?)),
+        ArchiveFormat::SevenZ => Ok((ArchiveFormat::SevenZ, sevenz_extract(data)?)),
         ArchiveFormat::Gz => {
             let decompressed = gz_decompress(data)?;
             match tar_extract(&decompressed) {
@@ -188,6 +195,34 @@ fn tar_create(entries: &[ArchiveEntry]) -> ToolResult<Vec<u8>> {
         builder.finish()?;
     }
     Ok(buf)
+}
+
+fn sevenz_extract(data: &[u8]) -> ToolResult<Vec<ArchiveEntry>> {
+    use sevenz_rust2::{ArchiveReader, Password};
+    use std::io::Cursor;
+    let mut reader = ArchiveReader::new(Cursor::new(data), Password::empty())
+        .map_err(|e| ToolError::Other(format!("7z 打开失败: {e}")))?;
+    let mut entries = Vec::new();
+    reader
+        .for_each_entries(|entry, stream| {
+            // 跳过目录与无数据条目
+            if entry.is_directory || !entry.has_stream {
+                return Ok(false);
+            }
+            let mut buf = Vec::new();
+            stream.read_to_end(&mut buf)?;
+            entries.push(ArchiveEntry {
+                path: entry.name.clone(),
+                data: buf,
+            });
+            Ok(false)
+        })
+        .map_err(|e| ToolError::Other(format!("7z 解压失败: {e}")))?;
+    // 路径安全校验(闭包返回类型限制,在外统一做)
+    for e in &entries {
+        validate_entry_path(&e.path)?;
+    }
+    Ok(entries)
 }
 
 fn zip_extract(data: &[u8]) -> ToolResult<Vec<ArchiveEntry>> {
@@ -272,6 +307,59 @@ mod tests {
                 data: b"world".to_vec(),
             },
         ]
+    }
+
+    // ---- 7z ----
+
+    /// 用 sevenz-rust2 writer 造一个含两文件的 7z 字节(真实数据,非 mock)
+    fn sample_sevenz() -> Vec<u8> {
+        use sevenz_rust2::{ArchiveEntry, ArchiveWriter};
+        let mut buf = Vec::new();
+        let mut writer = ArchiveWriter::new(std::io::Cursor::new(&mut buf)).unwrap();
+        let mut e1 = ArchiveEntry::new_file("a.txt");
+        e1.has_stream = true;
+        writer
+            .push_archive_entry(e1, Some(b"hello".as_slice()))
+            .unwrap();
+        let mut e2 = ArchiveEntry::new_file("dir/b.txt");
+        e2.has_stream = true;
+        writer
+            .push_archive_entry(e2, Some(b"world".as_slice()))
+            .unwrap();
+        writer.finish().unwrap();
+        buf
+    }
+
+    #[test]
+    fn detect_sevenz_magic() {
+        let data = sample_sevenz();
+        assert_eq!(detect_archive_format(&data).unwrap(), ArchiveFormat::SevenZ);
+    }
+
+    #[test]
+    fn sevenz_extract_roundtrip() {
+        let data = sample_sevenz();
+        let entries = archive_extract_as(&data, ArchiveFormat::SevenZ).unwrap();
+        assert_eq!(entries.len(), 2, "应解出 2 个文件");
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert!(paths.contains(&"a.txt"));
+        assert!(paths.contains(&"dir/b.txt"));
+        // 验证内容
+        for e in &entries {
+            if e.path == "a.txt" {
+                assert_eq!(e.data, b"hello");
+            }
+        }
+    }
+
+    #[test]
+    fn sevenz_create_rejected() {
+        // 7z 创建暂不支持
+        let entries = vec![ArchiveEntry {
+            path: "x".into(),
+            data: b"data".to_vec(),
+        }];
+        assert!(archive_create(&entries, ArchiveFormat::SevenZ).is_err());
     }
 
     // ---- detect_archive_format ----

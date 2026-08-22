@@ -2,6 +2,7 @@
   import { TOOLS, GROUP_LABEL, type Group, type Tool } from './tools';
   import { invoke } from './bindings';
   import { open as openDialog } from '@tauri-apps/plugin-dialog';
+  import hljs from 'highlight.js';
 
   let lang: 'zh' | 'en' = $state('zh');
   let query = $state('');
@@ -14,6 +15,14 @@
   let loading = $state(false);
   let copied = $state(false);
 
+  // Ctrl+K 命令面板
+  let paletteOpen = $state(false);
+  let paletteQuery = $state('');
+
+  // 收藏工具(localStorage 持久化)
+  const FAV_KEY = 'nextoolkit-favorites';
+  let favorites = $state<Set<string>>(loadFavorites());
+
   const groups: Group[] = ['encode', 'convert', 'format', 'generate', 'text', 'crypto', 'nettime', 'fileconv'];
 
   // 按搜索词过滤工具
@@ -22,6 +31,75 @@
     if (!q) return TOOLS;
     return TOOLS.filter((t) => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
   });
+
+  // 命令面板过滤结果
+  const paletteTools = $derived.by(() => {
+    const q = paletteQuery.trim().toLowerCase();
+    if (!q) return TOOLS;
+    return TOOLS.filter((t) => t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
+  });
+
+  // 收藏工具列表(置顶显示)
+  const favoriteTools = $derived(TOOLS.filter((t) => favorites.has(t.id)));
+
+  // 输出语法高亮:按工具推断语言
+  const highlightedOutput = $derived.by(() => {
+    if (!output) return '';
+    const language = outputLanguage(selectedTool.id);
+    if (!language) return escapeHtml(output);
+    try {
+      return hljs.highlight(output, { language }).value;
+    } catch {
+      return escapeHtml(output);
+    }
+  });
+
+  function loadFavorites(): Set<string> {
+    try {
+      const raw = localStorage.getItem(FAV_KEY);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function saveFavorites() {
+    localStorage.setItem(FAV_KEY, JSON.stringify([...favorites]));
+  }
+
+  function toggleFavorite(id: string) {
+    const next = new Set(favorites);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    favorites = next;
+    saveFavorites();
+  }
+
+  // 工具 id 到高亮语言的映射
+  function outputLanguage(toolId: string): string | null {
+    if (toolId.startsWith('json_') || toolId === 'jwt_decode' || toolId === 'jwt_verify') return 'json';
+    if (toolId === 'sql_format') return 'sql';
+    if (toolId.startsWith('xml_')) return 'xml';
+    if (toolId === 'yaml_to_json') return 'json';
+    if (toolId === 'json_to_yaml' || toolId === 'toml_to_json') return 'yaml';
+    if (toolId === 'md_to_html') return 'xml';
+    return null;
+  }
+
+  function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Ctrl+K 切换命令面板
+  function onKeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      paletteOpen = !paletteOpen;
+      paletteQuery = '';
+    } else if (e.key === 'Escape' && paletteOpen) {
+      paletteOpen = false;
+    }
+  }
 
   // 选中工具时,初始化参数默认值
   function selectTool(tool: Tool) {
@@ -34,6 +112,7 @@
     files = {};
     output = '';
     error = '';
+    paletteOpen = false;
   }
 
   // 文件参数:调系统对话框选择,单选存单元素数组,多选存数组
@@ -92,10 +171,31 @@
   }
 </script>
 
+<svelte:window onkeydown={onKeydown} />
+
+{#if paletteOpen}
+  <div class="palette-overlay" role="button" tabindex="-1" aria-label={t('关闭面板', 'Close palette')} onclick={() => (paletteOpen = false)} onkeydown={(e) => e.key === 'Enter' && (paletteOpen = false)}>
+    <div class="palette" role="presentation" onclick={(e) => e.stopPropagation()}>
+      <input class="palette-input" placeholder={t('搜索工具…', 'Search tools…')} bind:value={paletteQuery} />
+      <div class="palette-list">
+        {#each paletteTools as tool}
+          <button class="palette-item" onclick={() => selectTool(tool)}>
+            <span>{tool.name}</span>
+            <span class="palette-desc">{tool.desc}</span>
+          </button>
+        {/each}
+        {#if paletteTools.length === 0}
+          <div class="palette-empty">{t('无匹配工具', 'No matching tools')}</div>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
 <header class="topbar">
   <div class="brand">NexToolkit</div>
   <div class="badge">100% {t('本地', 'Local')} · {t('文件不离本机', 'Files never leave')}</div>
-  <input class="search" placeholder={t('搜索工具…', 'Search tools…')} bind:value={query} />
+  <input class="search" placeholder={t('搜索工具… (Ctrl+K)', 'Search tools… (Ctrl+K)')} bind:value={query} />
   <button class="lang" onclick={() => (lang = lang === 'zh' ? 'en' : 'zh')}>
     {lang === 'zh' ? 'EN' : '中'}
   </button>
@@ -103,6 +203,18 @@
 
 <main class="layout">
   <nav class="sidebar">
+    {#if favoriteTools.length > 0}
+      <div class="group-label">{t('收藏', 'Favorites')}</div>
+      {#each favoriteTools as tool}
+        <button
+          class="tool-btn"
+          class:active={selectedTool.id === tool.id}
+          onclick={() => selectTool(tool)}
+        >
+          {tool.name}
+        </button>
+      {/each}
+    {/if}
     {#each groups as g}
       {@const tools = filteredTools.filter((t) => t.group === g)}
       {#if tools.length > 0}
@@ -121,7 +233,12 @@
   </nav>
 
   <section class="panel">
-    <h2>{selectedTool.name}</h2>
+    <div class="tool-header">
+      <h2>{selectedTool.name}</h2>
+      <button class="fav-btn" class:active={favorites.has(selectedTool.id)} onclick={() => toggleFavorite(selectedTool.id)} title={t('收藏', 'Favorite')}>
+        {favorites.has(selectedTool.id) ? '★' : '☆'}
+      </button>
+    </div>
     <p class="desc">{selectedTool.desc}</p>
 
     {#if selectedTool.params.length > 0}
@@ -184,7 +301,7 @@
       {#if isSvgOutput()}
         <div class="svg-out">{@html output}</div>
       {:else}
-        <pre class="output">{output}</pre>
+        <pre class="output"><code class="hljs">{@html highlightedOutput}</code></pre>
       {/if}
     {/if}
   </section>
@@ -192,6 +309,16 @@
 
 <style>
   :global(*) { box-sizing: border-box; }
+
+  /* highlight.js 暗色主题 */
+  :global(.hljs) { color: #e4e6eb; }
+  :global(.hljs-keyword) { color: #c678dd; }
+  :global(.hljs-string) { color: #98c379; }
+  :global(.hljs-number) { color: #d19a66; }
+  :global(.hljs-comment) { color: #7f848e; font-style: italic; }
+  :global(.hljs-attr) { color: #61afef; }
+  :global(.hljs-tag) { color: #e06c75; }
+  :global(.hljs-built_in) { color: #56b6c2; }
   :global(body) { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; background: #0f1115; color: #e4e6eb; }
   .topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #16181d; border-bottom: 1px solid #23262e; }
   .brand { font-weight: 700; font-size: 18px; }
@@ -221,4 +348,16 @@
   .error { background: #2a1414; border: 1px solid #5c2020; color: #ffadad; padding: 10px; border-radius: 6px; font-family: monospace; white-space: pre-wrap; }
   .svg-out { background: #fff; border-radius: 6px; padding: 16px; display: flex; justify-content: center; }
   .svg-out :global(svg) { width: 240px; height: 240px; }
+  .tool-header { display: flex; align-items: center; gap: 10px; }
+  .fav-btn { background: transparent; border: none; color: #8b8f99; cursor: pointer; font-size: 18px; padding: 2px 6px; border-radius: 4px; }
+  .fav-btn:hover { background: #1c1f25; }
+  .fav-btn.active { color: #f5c518; }
+  .palette-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 100; }
+  .palette { background: #16181d; border: 1px solid #2a2d35; border-radius: 8px; width: 480px; max-width: 90vw; overflow: hidden; }
+  .palette-input { width: 100%; background: #0f1115; border: none; border-bottom: 1px solid #2a2d35; color: #e4e6eb; padding: 12px 14px; font-size: 14px; outline: none; }
+  .palette-list { max-height: 320px; overflow-y: auto; padding: 6px; }
+  .palette-item { display: flex; justify-content: space-between; gap: 12px; width: 100%; background: transparent; border: none; color: #c9ccd3; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; text-align: left; }
+  .palette-item:hover { background: #1c1f25; }
+  .palette-desc { color: #6b7280; font-size: 11px; }
+  .palette-empty { color: #6b7280; padding: 16px; text-align: center; font-size: 13px; }
 </style>

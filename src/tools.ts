@@ -48,6 +48,11 @@ export const TOOLS: Tool[] = [
   { id: 'hex_encode', group: 'encode', name: 'Hex 编码', desc: '十六进制编码', params: [], needsMainInput: true },
   { id: 'hex_decode', group: 'encode', name: 'Hex 解码', desc: '十六进制解码', params: [], needsMainInput: true },
   { id: 'jwt_decode', group: 'encode', name: 'JWT 解码', desc: '解析 header/payload(不验签)', params: [], needsMainInput: true },
+  {
+    id: 'jwt_verify', group: 'encode', name: 'JWT 验签', desc: 'HS256/RS256 验证签名',
+    params: [{ key: 'key', label: '密钥(HS256 secret 或 RS256 公钥 PEM)', kind: 'textarea' }],
+    needsMainInput: true,
+  },
 
   // ---- convert ----
   { id: 'json_to_yaml', group: 'convert', name: 'JSON → YAML', desc: 'JSON 转 YAML', params: [], needsMainInput: true },
@@ -63,6 +68,14 @@ export const TOOLS: Tool[] = [
       { key: 'from', label: '源进制', kind: 'number', default: '10' },
       { key: 'to', label: '目标进制', kind: 'number', default: '16' },
     ], needsMainInput: true,
+  },
+  {
+    id: 'unit_convert', group: 'convert', name: '单位换算', desc: '长度/质量/温度等 10 类',
+    params: [
+      { key: 'value', label: '值', kind: 'number', default: '1' },
+      { key: 'from', label: '从', kind: 'text', placeholder: 'km' },
+      { key: 'to', label: '到', kind: 'text', placeholder: 'm' },
+    ], needsMainInput: false,
   },
 
   // ---- format ----
@@ -151,6 +164,17 @@ export const TOOLS: Tool[] = [
     params: [{ key: 'privPem', label: '私钥 PEM', kind: 'textarea' }], needsMainInput: true,
   },
   {
+    id: 'rsa_sign', group: 'crypto', name: 'RSA 签名', desc: 'PKCS1v15/SHA256',
+    params: [{ key: 'privPem', label: '私钥 PEM', kind: 'textarea' }], needsMainInput: true,
+  },
+  {
+    id: 'rsa_verify', group: 'crypto', name: 'RSA 验签', desc: 'PKCS1v15/SHA256',
+    params: [
+      { key: 'pubPem', label: '公钥 PEM', kind: 'textarea' },
+      { key: 'signature', label: '签名(base64)', kind: 'text' },
+    ], needsMainInput: true,
+  },
+  {
     id: 'pbkdf2', group: 'crypto', name: 'PBKDF2', desc: '密钥派生',
     params: [
       { key: 'salt', label: 'salt', kind: 'text' },
@@ -181,6 +205,11 @@ export const TOOLS: Tool[] = [
     params: [{ key: 'rtype', label: '类型', kind: 'select', options: ['A', 'AAAA', 'MX', 'TXT'], default: 'A' }],
     needsMainInput: true,
   },
+  {
+    id: 'http_probe', group: 'nettime', name: 'HTTP 探测', desc: 'URL 状态码与响应头',
+    params: [{ key: 'url', label: 'URL', kind: 'text', placeholder: 'https://example.com' }],
+    needsMainInput: false,
+  },
 
   // ---- fileconv ----
   {
@@ -200,7 +229,7 @@ export const TOOLS: Tool[] = [
     id: 'archive_compress', group: 'fileconv', name: '压缩文件', desc: '创建归档(zip/tar/gz)',
     params: [
       { key: 'paths', label: '文件', kind: 'file', multiple: true },
-      { key: 'format', label: '格式', kind: 'select', options: ['zip', 'tar', 'targz', 'gz'], default: 'zip' },
+      { key: 'format', label: '格式', kind: 'select', options: ['zip', 'tar', 'targz', 'gz', '7z'], default: 'zip' },
     ],
     needsMainInput: false,
   },
@@ -208,7 +237,7 @@ export const TOOLS: Tool[] = [
     id: 'archive_convert', group: 'fileconv', name: '归档转换', desc: '归档格式互转',
     params: [
       { key: 'path', label: '归档文件', kind: 'file' },
-      { key: 'targetFormat', label: '目标格式', kind: 'select', options: ['zip', 'tar', 'targz', 'gz'], default: 'zip' },
+      { key: 'targetFormat', label: '目标格式', kind: 'select', options: ['zip', 'tar', 'targz', 'gz', '7z'], default: 'zip' },
     ],
     needsMainInput: false,
   },

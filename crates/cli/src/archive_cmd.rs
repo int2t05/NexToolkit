@@ -14,6 +14,7 @@ pub enum ArchiveFormatArg {
     Tar,
     Targz,
     Gz,
+    Sevenz,
 }
 
 impl ArchiveFormatArg {
@@ -23,6 +24,7 @@ impl ArchiveFormatArg {
             ArchiveFormatArg::Tar => nextool_fileconv::ArchiveFormat::Tar,
             ArchiveFormatArg::Targz => nextool_fileconv::ArchiveFormat::TarGz,
             ArchiveFormatArg::Gz => nextool_fileconv::ArchiveFormat::Gz,
+            ArchiveFormatArg::Sevenz => nextool_fileconv::ArchiveFormat::SevenZ,
         }
     }
 }

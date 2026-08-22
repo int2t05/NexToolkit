@@ -4,7 +4,7 @@
 
 ## 功能
 
-42 个工具,8 组:编解码、格式转换、格式化、生成器、文本、加密、网络/时间、文件转换。CLI 与 GUI 共享同一核心库,行为一致。文件转换产物落源文件所在目录。
+47 个工具,8 组:编解码、格式转换、格式化、生成器、文本、加密、网络/时间、文件转换。CLI 与 GUI 共享同一核心库,行为一致。文件转换产物落源文件所在目录。
 
 ## 架构
 
@@ -57,15 +57,21 @@ nextool text regex-match '\d+' "a12b3"
 # 加密
 nextool crypto aes-encrypt --password pw "Secret"
 nextool crypto rsa-keygen 2048
+nextool crypto rsa-sign --priv-pem key.pem "data"
+nextool encode jwt-verify --key secret "<jwt>"
 
 # 网络/时间
 nextool net-time ipcalc 192.168.1.5/24
 nextool net-time cron-next "0 * * * * *" --count 3
 nextool net-time dns A example.com
+nextool net-time http https://example.com
+
+# 单位换算
+nextool convert unit 1 km m                          # 1000
 
 # 文件转换(归档,产物落源目录)
 nextool file-conv archive list archive.zip              # 列出归档内文件
-nextool file-conv archive extract archive.zip           # 解压到 archive_extracted/
+nextool file-conv archive extract archive.7z            # 解压(支持 zip/tar/gz/7z)
 nextool file-conv archive compress zip a.txt b.txt      # 压缩为 a.zip
 nextool file-conv archive convert archive.zip tar       # 转 a.tar
 
@@ -97,10 +103,10 @@ core 单测 + CLI 集成测试,CI 三平台编译验证。
 
 ## 未来方向
 
-- **文件转换(对标 freeconvert)**:归档(zip/tar/gz)+ 图像(7 格式互转缩放)+ PDF(拆分/旋转/加解密)已交付;PDF 合并/压缩优化、音视频(ffmpeg 子进程)待做;产物落源目录。
-- **引擎层**:重格式转换按需接入,核心包不打包重引擎。
+- **文件转换(对标 freeconvert)**:归档(zip/tar/gz/7z)+ 图像(7 格式)+ PDF(拆分/旋转/加解密)+ 单位换算(10 类)+ HTTP 探测已交付;PDF 合并、音视频(ffmpeg 子进程,框架已建)待做;产物落源目录。
+- **引擎层**:重格式转换按需接入(`fileconv::engine` 框架已建),核心包不打包重引擎。
 - **智能层**:Smart Detection(剪贴板自动选工具)、Recipe 流水线(工具链式组合)。
-- **交互**:Ctrl+K 命令面板、收藏、输出语法高亮。
+- **交互**:输出语法高亮、Ctrl+K 命令面板、收藏(localStorage)。
 - 详见 [docs/todo.md](docs/todo.md)。
 
 ## 文档

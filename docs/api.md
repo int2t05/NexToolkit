@@ -32,6 +32,7 @@ const out = await invoke<string>('base64_encode', { input: 'Hello' })
 | `hex_encode` | `input: string` | 十六进制 | — |
 | `hex_decode` | `input: string` | 解码字符串 | `Parse`/`Utf8` |
 | `jwt_decode` | `input: string` | header/payload pretty JSON | `InvalidInput`/`Base64`/`Json` |
+| `jwt_verify` | `input: string`, `key: string` | payload pretty JSON | `InvalidInput`(格式/alg 不支持/验签失败)/`Other` |
 
 ## 转换
 
@@ -45,6 +46,7 @@ const out = await invoke<string>('base64_encode', { input: 'Hello' })
 | `csv_to_json` | `input: string` | JSON 数组 | `Other`/`Json` |
 | `md_to_html` | `input: string` | HTML | — |
 | `numbase_convert` | `input: string`, `from: u32`, `to: u32` | 数字字符串 | `InvalidInput`(进制 ∉ 2..36 / 解析失败) |
+| `unit_convert` | `value: f64`, `from: string`, `to: string` | 数字字符串 | `InvalidInput`(未知单位/跨类) |
 
 ## 格式化
 
@@ -90,6 +92,8 @@ const out = await invoke<string>('base64_encode', { input: 'Hello' })
 | `rsa_keygen` | `bits: usize` | PEM 密钥对 | `InvalidInput`(<2048)/`Other` |
 | `rsa_encrypt` | `input: string`, `pub_pem: string` | base64 密文 | `InvalidInput`(无效 PEM)/`Other` |
 | `rsa_decrypt` | `input: string`, `priv_pem: string` | 明文 | `Base64`/`InvalidInput`/`Other` |
+| `rsa_sign` | `input: string`, `priv_pem: string` | base64 签名 | `InvalidInput`(无效 PEM)/`Other` |
+| `rsa_verify` | `input: string`, `pub_pem: string`, `signature: string` | "签名验证通过" | `InvalidInput`(无效 PEM/签名/验签失败) |
 | `pbkdf2` | `input: string`, `salt: string`, `iterations: u32` | 十六进制派生密钥(32B) | — |
 | `argon2` | `input: string`, `salt: string` | 十六进制哈希(32B) | `InvalidInput`(salt <8 字节)/`Other` |
 
@@ -102,10 +106,11 @@ const out = await invoke<string>('base64_encode', { input: 'Hello' })
 | `timestamp_from_human` | `input: string`, `tz: string` | Unix 秒字符串 | `Parse`(时间格式 / 时区 / 夏令时歧义) |
 | `cron_next` | `input: string`, `count: usize` | 下次触发列表(每行一个 RFC3339) | `InvalidInput`(count=0)/`Parse`(非法 cron) |
 | `dns_lookup` | `input: string`, `rtype: string` | DNS 记录(每行一条) | `InvalidInput`(未知类型)/`Io`/`Other` |
+| `http_probe` | `url: string` | 状态码/最终 URL/响应头多行 | `InvalidInput`(URL 非法)/`Other`(请求失败) |
 
 ## 文件转换
 
-字节域命令(command 接收文件路径,后端 `std::fs` 读写,返回路径或路径列表)。归档格式枚举:`"zip"|"tar"|"targz"|"gz"`;图像格式:`"png"|"jpg"|"gif"|"bmp"|"webp"|"tiff"|"ico"`。
+字节域命令(command 接收文件路径,后端 `std::fs` 读写,返回路径或路径列表)。归档格式枚举:`"zip"|"tar"|"targz"|"gz"|"7z"`(7z 仅解压);图像格式:`"png"|"jpg"|"gif"|"bmp"|"webp"|"tiff"|"ico"`。
 
 | 命令 | 参数 | 返回 | 错误 |
 |---|---|---|---|
