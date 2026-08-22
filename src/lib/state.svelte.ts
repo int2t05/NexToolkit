@@ -5,7 +5,7 @@
 import { invoke } from '../bindings';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import hljs from 'highlight.js';
-import type { ToolMetaDto } from './types';
+import type { ToolMetaDto, EngineStatusDto } from './types';
 import { escapeHtml } from './format';
 
 const FAV_KEY = 'nextoolkit-favorites';
@@ -66,6 +66,9 @@ class AppState {
   recent = $state<string[]>(loadRecent());
   collapsedGroups = $state<Set<string>>(loadCollapsed());
 
+  // ── 引擎状态(运行时探测)──────────────────────────
+  engines = $state<EngineStatusDto[]>([]);
+
   // ── 派生 ──────────────────────────────────────────
   filteredTools = $derived.by(() => {
     const q = this.query.trim().toLowerCase();
@@ -114,8 +117,18 @@ class AppState {
       this.textIds = new Set(textTools.map((tool) => tool.id));
       this.tools = [...textTools, ...fileTools];
       if (this.tools.length > 0 && !this.selectedTool) this.selectTool(this.tools[0]);
+      this.loadEngines();
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  /** 探测引擎可用性(失败静默,引擎状态非关键路径) */
+  async loadEngines() {
+    try {
+      this.engines = await invoke<EngineStatusDto[]>('list_engines');
+    } catch {
+      this.engines = [];
     }
   }
 

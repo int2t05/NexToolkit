@@ -113,6 +113,28 @@ pub fn list_file_tools() -> Vec<ToolMetaDto> {
     FILE_TOOLS.iter().map(tool_meta_to_dto).collect()
 }
 
+// 引擎状态(运行时探测,供前端展示哪些引擎已装)
+
+#[derive(serde::Serialize)]
+pub struct EngineStatusDto {
+    pub binary: String,
+    pub desc: String,
+    pub available: bool,
+}
+
+/// 探测所有引擎可用性(ffmpeg/LibreOffice/calibre/pandoc/Ghostscript/tesseract)
+#[tauri::command]
+pub fn list_engines() -> Vec<EngineStatusDto> {
+    nextool_core::engine_statuses(&nextool_core::SubprocessRunner)
+        .into_iter()
+        .map(|s| EngineStatusDto {
+            binary: s.binary.into(),
+            desc: s.desc.into(),
+            available: s.available,
+        })
+        .collect()
+}
+
 /// 文件工具静态元数据:与 tools.ts 的 fileconv 段对齐
 ///
 /// output_kind 统一为 Text(产物为路径或路径列表,无需语法高亮);

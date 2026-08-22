@@ -7,8 +7,8 @@ mod commands;
 
 use commands::{
     archive_compress, archive_convert, archive_extract, archive_list, av_convert, ebook_convert,
-    image_convert, image_resize, list_file_tools, list_tools, markup_convert, ocr, office_to_pdf,
-    pdf_compress, pdf_decrypt, pdf_encrypt, pdf_rotate, pdf_split, run_tool,
+    image_convert, image_resize, list_engines, list_file_tools, list_tools, markup_convert, ocr,
+    office_to_pdf, pdf_compress, pdf_decrypt, pdf_encrypt, pdf_rotate, pdf_split, run_tool,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -20,6 +20,7 @@ pub fn run() {
             list_tools,
             run_tool,
             list_file_tools,
+            list_engines,
             // 文件转换命令(签名各异,独立注册)
             archive_list,
             archive_extract,

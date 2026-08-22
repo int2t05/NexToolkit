@@ -54,3 +54,10 @@ export const GROUP_CAT_VAR: Record<string, string> = {
   nettime: '--ntx-cat-nettime',
   fileconv: '--ntx-cat-fileconv',
 };
+
+// 引擎状态(运行时探测,对齐 Rust EngineStatusDto)
+export interface EngineStatusDto {
+  binary: string;
+  desc: string;
+  available: boolean;
+}

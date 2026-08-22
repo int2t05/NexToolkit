@@ -119,6 +119,8 @@ enum ArchiveCmd {
 
 #[derive(Subcommand)]
 enum EngineCmd {
+    /// 列出所有引擎及可用性(探测系统已装)
+    List,
     /// 音视频转换(ffmpeg,--to 指定目标格式如 mp3/wav/aac/mp4)
     Av {
         input: String,
@@ -250,6 +252,16 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
             }
         },
         FileConvCmd::Engine { cmd } => match cmd {
+            EngineCmd::List => {
+                let statuses = nextool_core::engine_statuses(&nextool_core::SubprocessRunner);
+                for s in &statuses {
+                    let mark = if s.available { "✓" } else { "✗" };
+                    println!("{mark} {:<14} {}", s.binary, s.desc);
+                }
+                let avail = statuses.iter().filter(|s| s.available).count();
+                println!("已装 {avail}/{} 个引擎", statuses.len());
+                Ok(())
+            }
             EngineCmd::Av { input, to, output } => {
                 let out = nextool_core::engine_convert_file(
                     &input,

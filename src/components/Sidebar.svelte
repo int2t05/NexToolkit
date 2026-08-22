@@ -79,6 +79,19 @@
     {/each}
   </div>
 
+  {#if appState.engines.length > 0}
+    <div class="engines-bar" title={appState.t('引擎可用性(绿=已装)', 'Engine availability (green=installed)')}>
+      <span class="engines-label">{appState.t('引擎', 'Engines')}</span>
+      {#each appState.engines as eng (eng.binary)}
+        <span
+          class="engine-dot"
+          class:available={eng.available}
+          title={`${eng.binary} — ${eng.desc} (${eng.available ? '✓' : '✗'})`}
+        ></span>
+      {/each}
+    </div>
+  {/if}
+
   <div class="sidebar-footer">
     <span class="ver">v0.3.0</span>
     <span class="local-badge">100% {appState.t('本地', 'Local')}</span>
@@ -198,6 +211,29 @@
     background: var(--ntx-primary-soft);
     color: var(--ntx-primary);
     font-weight: 500;
+  }
+  .engines-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--ntx-space-1);
+    padding: var(--ntx-space-2) var(--ntx-space-3);
+    border-top: 1px solid var(--ntx-border);
+  }
+  .engines-label {
+    font-size: 10px;
+    color: var(--ntx-fg-subtle);
+    margin-right: var(--ntx-space-1);
+  }
+  .engine-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ntx-danger);
+    flex-shrink: 0;
+    cursor: help;
+  }
+  .engine-dot.available {
+    background: var(--ntx-success);
   }
   .sidebar-footer {
     display: flex;

@@ -56,6 +56,18 @@ impl Engine {
         }
     }
 
+    /// 全部引擎(展示与探测遍历用)
+    pub fn all() -> &'static [Engine] {
+        &[
+            Engine::Ffmpeg,
+            Engine::LibreOffice,
+            Engine::Calibre,
+            Engine::Pandoc,
+            Engine::Ghostscript,
+            Engine::Tesseract,
+        ]
+    }
+
     /// 构造转换命令参数(返回完整参数列表,不含二进制名)
     ///
     /// 各引擎的典型转换命令:input→output 格式由扩展名推断。
@@ -153,6 +165,28 @@ pub fn engine_convert(
     }
     runner.run(engine, input, output)?;
     Ok(output.to_string())
+}
+
+/// 引擎状态(探测结果):供 CLI/GUI 展示哪些引擎已装
+#[derive(Debug, Clone)]
+pub struct EngineStatus {
+    pub engine: Engine,
+    pub available: bool,
+    pub binary: &'static str,
+    pub desc: &'static str,
+}
+
+/// 探测所有引擎可用性,返回状态列表(供 CLI/GUI 展示引擎检查结果)
+pub fn engine_statuses(runner: &dyn EngineRunner) -> Vec<EngineStatus> {
+    Engine::all()
+        .iter()
+        .map(|&e| EngineStatus {
+            engine: e,
+            available: runner.is_available(e),
+            binary: e.binary(),
+            desc: e.desc(),
+        })
+        .collect()
 }
 
 #[cfg(test)]
