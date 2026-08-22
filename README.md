@@ -69,20 +69,28 @@ nextool net-time http https://example.com
 nextool convert unit 1 km m                     # 1000
 
 # 文件转换(归档,产物落源目录)
-nextool fileconv archive list archive.zip
-nextool fileconv archive extract archive.7z     # 支持 zip/tar/gz/7z
-nextool fileconv archive compress zip a.txt b.txt
-nextool fileconv archive convert archive.zip tar
+nextool file-conv archive list archive.zip
+nextool file-conv archive extract archive.7z     # 支持 zip/tar/gz/7z
+nextool file-conv archive compress zip a.txt b.txt
+nextool file-conv archive convert archive.zip tar
 
 # 文件转换(图像)
-nextool fileconv image convert photo.png jpg
-nextool fileconv image resize big.png --width 800 --height 0   # 按宽等比
+nextool file-conv image convert photo.png jpg
+nextool file-conv image resize big.png --width 800 --height 0   # 按宽等比
 
 # 文件转换(PDF)
-nextool fileconv pdf split doc.pdf
-nextool fileconv pdf rotate doc.pdf             # 所有页顺时针 90°
-nextool fileconv pdf encrypt doc.pdf --password secret
-nextool fileconv pdf decrypt doc.pdf --password secret
+nextool file-conv pdf split doc.pdf
+nextool file-conv pdf rotate doc.pdf             # 所有页顺时针 90°
+nextool file-conv pdf encrypt doc.pdf --password secret
+nextool file-conv pdf decrypt doc.pdf --password secret
+
+# 引擎转换(运行时探测系统已装引擎,未装则提示安装)
+nextool file-conv engine av video.mp4 --to mp3         # ffmpeg 音视频
+nextool file-conv engine office-to-pdf doc.docx        # LibreOffice Office→PDF
+nextool file-conv engine ebook book.epub --to pdf      # calibre 电子书
+nextool file-conv engine markup note.md --to html      # pandoc 标记语言
+nextool file-conv engine pdf-compress big.pdf          # Ghostscript PDF 压缩
+nextool file-conv engine ocr scan.png                  # tesseract OCR
 ```
 
 工具全集与参数详见 [docs/api.md](docs/api.md)。
@@ -107,8 +115,8 @@ cp scripts/pre-push.sh .git/hooks/pre-push && chmod +x .git/hooks/pre-push
 
 ## 未来方向
 
-- **文件转换(对标 freeconvert)**:归档(zip/tar/gz/7z)+ 图像(7 格式)+ PDF(拆分/旋转/加解密)+ 单位换算(10 类)+ HTTP 探测已交付;PDF 合并、音视频(ffmpeg 子进程,框架已建)待做。详见 [docs/todo.md](docs/todo.md)。
-- **引擎层**:重格式转换按需接入(`core::fileconv::engine` — `EngineRunner` port 已实现);核心包不打包重引擎。
+- **文件转换(对标 freeconvert)**:归档(zip/tar/gz/7z)+ 图像(7 格式)+ PDF(拆分/旋转/加解密)+ 单位换算(10 类)+ HTTP 探测已交付;6 引擎转换(ffmpeg/LibreOffice/calibre/pandoc/Ghostscript/tesseract,运行时探测)已接线。PDF 合并待做。详见 [docs/todo.md](docs/todo.md)。
+- **引擎层**:6 引擎已接线通用命令(`file-conv engine <av|office-to-pdf|ebook|markup|pdf-compress|ocr>`),运行时探测系统已装;核心包不打包重引擎。
 - **智能层**:Smart Detection(剪贴板自动选工具)、Recipe 流水线(工具链式组合)。
 - **i18n**:中英已交付;日韩待做。
 

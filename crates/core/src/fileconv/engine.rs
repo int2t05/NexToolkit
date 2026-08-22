@@ -16,6 +16,8 @@ pub enum Engine {
     LibreOffice,
     /// 电子书转换
     Calibre,
+    /// 标记语言互转(MD/HTML/RST/AsciiDoc/Org/Tex/...)
+    Pandoc,
     /// PDF 压缩优化/PS/EPS
     Ghostscript,
     /// OCR
@@ -29,7 +31,15 @@ impl Engine {
             Engine::Ffmpeg => "ffmpeg",
             Engine::LibreOffice => "soffice",
             Engine::Calibre => "ebook-convert",
-            Engine::Ghostscript => "gs",
+            Engine::Pandoc => "pandoc",
+            Engine::Ghostscript => {
+                // Windows 二进制为 gswin64c(64 位 CLI),Unix 为 gs
+                if cfg!(windows) {
+                    "gswin64c"
+                } else {
+                    "gs"
+                }
+            }
             Engine::Tesseract => "tesseract",
         }
     }
@@ -40,6 +50,7 @@ impl Engine {
             Engine::Ffmpeg => "音视频转码",
             Engine::LibreOffice => "Office↔PDF",
             Engine::Calibre => "电子书转换",
+            Engine::Pandoc => "标记语言转换",
             Engine::Ghostscript => "PDF 优化/PS/EPS",
             Engine::Tesseract => "OCR 文字识别",
         }
@@ -66,6 +77,7 @@ impl Engine {
                 input.into(),
             ],
             Engine::Calibre => vec![input.into(), output.into()],
+            Engine::Pandoc => vec![input.into(), "-o".into(), output.into()],
             Engine::Ghostscript => vec![
                 "-sDEVICE=pdfwrite".into(),
                 "-dPDFSETTINGS=/ebook".into(),
@@ -73,7 +85,14 @@ impl Engine {
                 output.into(),
                 input.into(),
             ],
-            Engine::Tesseract => vec![input.into(), output.into()],
+            Engine::Tesseract => {
+                // tesseract 自动给输出加扩展名(.txt),output 参数传 basename(去扩展名)
+                let base = std::path::Path::new(output)
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| output.to_string());
+                vec![input.into(), base]
+            }
         }
     }
 }
@@ -146,7 +165,11 @@ mod tests {
         assert_eq!(Engine::Ffmpeg.binary(), "ffmpeg");
         assert_eq!(Engine::LibreOffice.binary(), "soffice");
         assert_eq!(Engine::Calibre.binary(), "ebook-convert");
-        assert_eq!(Engine::Ghostscript.binary(), "gs");
+        assert_eq!(Engine::Pandoc.binary(), "pandoc");
+        assert_eq!(
+            Engine::Ghostscript.binary(),
+            if cfg!(windows) { "gswin64c" } else { "gs" }
+        );
         assert_eq!(Engine::Tesseract.binary(), "tesseract");
     }
 
@@ -175,6 +198,19 @@ mod tests {
         // --convert-to 应取 output 扩展名 pdf
         assert!(args.contains(&"pdf".to_string()));
         assert!(args.contains(&"--headless".to_string()));
+    }
+
+    #[test]
+    fn tesseract_convert_args_strips_ext() {
+        // tesseract 自动加 .txt,output 须传 basename,否则生成 .txt.txt
+        let args = Engine::Tesseract.convert_args("in.png", "out.txt");
+        assert_eq!(args, vec!["in.png", "out"]);
+    }
+
+    #[test]
+    fn pandoc_convert_args() {
+        let args = Engine::Pandoc.convert_args("in.md", "out.html");
+        assert_eq!(args, vec!["in.md", "-o", "out.html"]);
     }
 
     /// 测试桩:受控 available/succeed,记录最后一次 run 调用的引擎与路径

@@ -385,6 +385,181 @@ static FILE_TOOLS: &[ToolMeta] = &[
         needs_main_input: false,
         output_kind: OutputKind::Text,
     },
+    ToolMeta {
+        id: "av_convert",
+        name: "音视频转换",
+        desc: "ffmpeg 转码(音视频格式互转)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "音视频文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "to",
+                kind: ParamKind::Select,
+                label: "目标格式",
+                default: Some("mp3"),
+                options: &[
+                    "mp3", "wav", "aac", "flac", "ogg", "m4a", "mp4", "mkv", "webm", "mov", "avi",
+                ],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "office_to_pdf",
+        name: "Office 转 PDF",
+        desc: "LibreOffice(docx/xlsx/pptx→pdf)",
+        group: "fileconv",
+        params: &[ParamSpec {
+            key: "path",
+            kind: ParamKind::File,
+            label: "Office 文档",
+            default: None,
+            options: &[],
+            placeholder: None,
+            multiple: false,
+        }],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "ebook_convert",
+        name: "电子书转换",
+        desc: "calibre(epub/mobi/pdf 互转)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "电子书文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "to",
+                kind: ParamKind::Select,
+                label: "目标格式",
+                default: Some("epub"),
+                options: &["epub", "mobi", "pdf", "txt", "azw3"],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "markup_convert",
+        name: "标记语言转换",
+        desc: "pandoc(md/html/rst/adoc/org/tex 互转)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "标记文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "to",
+                kind: ParamKind::Select,
+                label: "目标格式",
+                default: Some("html"),
+                options: &["html", "md", "rst", "adoc", "org", "tex", "docx"],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "pdf_compress",
+        name: "PDF 压缩",
+        desc: "Ghostscript 优化(输出 _converted.pdf)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "PDF 文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "output",
+                kind: ParamKind::Text,
+                label: "输出路径",
+                default: None,
+                options: &[],
+                placeholder: Some("默认源文件旁 _converted.pdf"),
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
+        id: "ocr",
+        name: "OCR 识别",
+        desc: "tesseract 图片转文本",
+        group: "fileconv",
+        params: &[ParamSpec {
+            key: "path",
+            kind: ParamKind::File,
+            label: "图片文件",
+            default: None,
+            options: &[],
+            placeholder: None,
+            multiple: false,
+        }],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
 ];
 
 // 文件转换命令:归档/图像/PDF(接收路径,委托 fileconv 落盘,返回路径或路径列表)
@@ -493,5 +668,77 @@ pub fn pdf_decrypt(path: String, password: String, output: Option<String>) -> Cm
         &path,
         &password,
         output.as_deref(),
+    )?)
+}
+
+/// 音视频转换(ffmpeg,运行时探测);返回产物路径
+#[tauri::command]
+pub fn av_convert(input: String, to: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::engine_convert_file(
+        &input,
+        nextool_core::Engine::Ffmpeg,
+        &to,
+        output.as_deref(),
+        &nextool_core::SubprocessRunner,
+    )?)
+}
+
+/// Office 文档转 PDF(LibreOffice,输出源文件旁);返回产物路径
+#[tauri::command]
+pub fn office_to_pdf(input: String) -> CmdResult<String> {
+    Ok(nextool_core::engine_convert_file(
+        &input,
+        nextool_core::Engine::LibreOffice,
+        "pdf",
+        None,
+        &nextool_core::SubprocessRunner,
+    )?)
+}
+
+/// 电子书转换(calibre,运行时探测);返回产物路径
+#[tauri::command]
+pub fn ebook_convert(input: String, to: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::engine_convert_file(
+        &input,
+        nextool_core::Engine::Calibre,
+        &to,
+        output.as_deref(),
+        &nextool_core::SubprocessRunner,
+    )?)
+}
+
+/// 标记语言转换(pandoc,运行时探测);返回产物路径
+#[tauri::command]
+pub fn markup_convert(input: String, to: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::engine_convert_file(
+        &input,
+        nextool_core::Engine::Pandoc,
+        &to,
+        output.as_deref(),
+        &nextool_core::SubprocessRunner,
+    )?)
+}
+
+/// PDF 压缩优化(Ghostscript,输出源文件旁 _converted.pdf);返回产物路径
+#[tauri::command]
+pub fn pdf_compress(input: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::engine_convert_file(
+        &input,
+        nextool_core::Engine::Ghostscript,
+        "pdf",
+        output.as_deref(),
+        &nextool_core::SubprocessRunner,
+    )?)
+}
+
+/// OCR 图片转文本(tesseract,输出源文件旁 .txt);返回产物路径
+#[tauri::command]
+pub fn ocr(input: String) -> CmdResult<String> {
+    Ok(nextool_core::engine_convert_file(
+        &input,
+        nextool_core::Engine::Tesseract,
+        "txt",
+        None,
+        &nextool_core::SubprocessRunner,
     )?)
 }

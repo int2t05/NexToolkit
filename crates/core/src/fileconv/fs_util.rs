@@ -248,10 +248,22 @@ pub fn engine_convert_file(
 ) -> ToolResult<String> {
     let out_path = match output {
         Some(o) => o.to_string(),
-        None => super::path::compute_output_path(input, output_ext, 0),
+        None => {
+            // 默认输出源文件旁;若同扩展名会覆盖源文件(如 pdf→pdf 压缩),用 _converted 后缀避开
+            let attempt = if same_ext(input, output_ext) { 1 } else { 0 };
+            super::path::compute_output_path(input, output_ext, attempt)
+        }
     };
     super::engine_convert(runner, engine, input, &out_path)?;
     Ok(out_path)
+}
+
+/// 输入路径末段扩展名是否与目标扩展名相同(忽略大小写)
+fn same_ext(input: &str, ext: &str) -> bool {
+    Path::new(input)
+        .extension()
+        .map(|e| e.eq_ignore_ascii_case(ext))
+        .unwrap_or(false)
 }
 
 // ---- 通用 IO helpers(无 feature gate)----

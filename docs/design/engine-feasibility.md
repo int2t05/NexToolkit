@@ -102,6 +102,8 @@ CLI 行为:直接打印错误信息,退出码非零。
 
 ## 接线步骤
 
+> **状态(2026-08)**:6 引擎已接线通用 CLI/GUI 命令(`file-conv engine <av|office-to-pdf|ebook|markup|pdf-compress|ocr>`),运行时探测 + `engine_convert_file` 统一落盘(同扩展名自动 `_converted` 后缀避免覆盖源)。下表进度反馈机制为待做项(当前同步执行,无进度流)。
+
 每引擎独立接线,互不阻塞。按需求优先级排序:
 
 | 顺序 | 引擎 | 用途 | 进度反馈机制 |

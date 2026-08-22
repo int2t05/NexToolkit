@@ -30,6 +30,11 @@ enum FileConvCmd {
         #[command(subcommand)]
         cmd: PdfCmd,
     },
+    /// 引擎转换:音视频/Office/电子书/标记/PDF压缩/OCR(运行时探测系统已装引擎)
+    Engine {
+        #[command(subcommand)]
+        cmd: EngineCmd,
+    },
 }
 
 #[derive(Subcommand)]
@@ -110,6 +115,44 @@ enum ArchiveCmd {
         #[arg(long)]
         output: Option<String>,
     },
+}
+
+#[derive(Subcommand)]
+enum EngineCmd {
+    /// 音视频转换(ffmpeg,--to 指定目标格式如 mp3/wav/aac/mp4)
+    Av {
+        input: String,
+        #[arg(long)]
+        to: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// Office 文档转 PDF(LibreOffice,输出源文件旁)
+    OfficeToPdf { input: String },
+    /// 电子书转换(calibre,--to 指定目标格式如 epub/mobi/pdf)
+    Ebook {
+        input: String,
+        #[arg(long)]
+        to: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 标记语言转换(pandoc,--to 指定目标格式如 html/rst/adoc/org/tex)
+    Markup {
+        input: String,
+        #[arg(long)]
+        to: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// PDF 压缩优化(Ghostscript,输出源文件旁 _converted.pdf)
+    PdfCompress {
+        input: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// OCR 图片转文本(tesseract,输出源文件旁 .txt)
+    Ocr { input: String },
 }
 
 pub fn run(args: FileConvArgs) -> Result<(), String> {
@@ -203,6 +246,80 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 let out = nextool_core::decrypt_pdf(&input, &password, output.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已解密 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Engine { cmd } => match cmd {
+            EngineCmd::Av { input, to, output } => {
+                let out = nextool_core::engine_convert_file(
+                    &input,
+                    nextool_core::Engine::Ffmpeg,
+                    &to,
+                    output.as_deref(),
+                    &nextool_core::SubprocessRunner,
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            EngineCmd::OfficeToPdf { input } => {
+                let out = nextool_core::engine_convert_file(
+                    &input,
+                    nextool_core::Engine::LibreOffice,
+                    "pdf",
+                    None,
+                    &nextool_core::SubprocessRunner,
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            EngineCmd::Ebook { input, to, output } => {
+                let out = nextool_core::engine_convert_file(
+                    &input,
+                    nextool_core::Engine::Calibre,
+                    &to,
+                    output.as_deref(),
+                    &nextool_core::SubprocessRunner,
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            EngineCmd::Markup { input, to, output } => {
+                let out = nextool_core::engine_convert_file(
+                    &input,
+                    nextool_core::Engine::Pandoc,
+                    &to,
+                    output.as_deref(),
+                    &nextool_core::SubprocessRunner,
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            EngineCmd::PdfCompress { input, output } => {
+                let out = nextool_core::engine_convert_file(
+                    &input,
+                    nextool_core::Engine::Ghostscript,
+                    "pdf",
+                    output.as_deref(),
+                    &nextool_core::SubprocessRunner,
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已压缩 {out}");
+                Ok(())
+            }
+            EngineCmd::Ocr { input } => {
+                let out = nextool_core::engine_convert_file(
+                    &input,
+                    nextool_core::Engine::Tesseract,
+                    "txt",
+                    None,
+                    &nextool_core::SubprocessRunner,
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已识别 {out}");
                 Ok(())
             }
         },

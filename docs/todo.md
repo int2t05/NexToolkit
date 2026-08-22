@@ -763,17 +763,22 @@ flowchart TD
 ## 引擎层接线设计(对接 codebase-audit.md 接缝 C)
 
 > `core::fileconv::engine` 已实现 `EngineRunner` port + `SubprocessRunner`(prod)+ `FakeRunner`(test)+ `engine_convert`/`engine_convert_file`。
-> 接线步骤(每个引擎独立,不阻塞其他):
+> **接线状态**:6 引擎已接线通用 CLI/GUI 命令(`file-conv engine <av|office-to-pdf|ebook|markup|pdf-compress|ocr>`),运行时探测系统已装,未装返回明确错误。各引擎经 `engine_convert_file` 统一落盘。进度流(Tauri Channel)待做。
 
-1. **ffmpeg 接线**(音视频):`engine_convert(engine, input, output, &SubprocessRunner)` + Tauri Channel 进度流(解析 ffmpeg stderr `frame=` 行)
-2. **LibreOffice 接线**(Office↔PDF):同上,无进度行,用文件大小增长估算
-3. **calibre 接线**(电子书):同上,ebook-convert 有百分比输出
-4. **Ghostscript 接线**(PDF 压缩):同上
-5. **tesseract 接线**(OCR):同上,有进度百分比
+| 引擎 | 命令 | 覆盖 todo 项 | 状态 |
+|---|---|---|---|
+| ffmpeg | `engine av --to` | V-01~26 音视频互转 | ✓ 接线 |
+| LibreOffice | `engine office-to-pdf` | D-01~13 Office→PDF | ✓ 接线 |
+| calibre | `engine ebook --to` | E-01~22 电子书 | ✓ 接线 |
+| pandoc | `engine markup --to` | D-66~88 标记语言互转 | ✓ 接线 |
+| Ghostscript | `engine pdf-compress` | P-10 PDF 压缩 | ✓ 接线 |
+| tesseract | `engine ocr` | P-11 OCR | ✓ 接线 |
 
-每个引擎接线的 `fs_util` 包装(`engine_convert_file`)负责:读输入路径 → 调 `engine_convert` → 产物落盘(碰撞处理)。与 archive/image/pdf 的 `fs_util` 模式一致。
+每个引擎接线的 `fs_util` 包装(`engine_convert_file`)负责:读输入路径 → 调 `engine_convert` → 产物落盘(同扩展名自动 `_converted` 后缀避免覆盖源)。
 
 **原则:** 重引擎不打包进核心,运行时探测系统已装,首次使用提示安装。数据纯本地。
+
+**待做**:进度流(长任务 Tauri Channel 推送)、引擎高级参数(ffmpeg CRF/编码、LibreOffice 格式过滤等)、PDF→Office 反向(D-14~19 高质量布局,LibreOffice 有限)。
 
 ---
 
