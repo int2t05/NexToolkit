@@ -150,7 +150,7 @@ npm run check                         # svelte-check
 ## 避坑
 
 1. **不手写 crypto**:PBKDF2/AES-GCM/RSA/Argon2/HMAC/Hash 全用成熟 crate。
-2. **commands.rs 38 个命令**:34 文件命令(archive 4 + image 7 + pdf 12 + font 2 + svg 1 + xlsx 2 + engine 6,签名各异独立注册)+ 4 通用命令(list_tools/run_tool/list_file_tools/list_engines),文本工具经 `run_tool` 通用分发不再逐个注册。
+2. **commands.rs 36 个命令**:32 文件命令(通用转换 1 + archive 4 + image 7 + pdf 12 + font 2 + svg 1 + xlsx 2 + 提取 1 + 引擎 2,签名各异独立注册)+ 4 通用命令(list_tools/run_tool/list_file_tools/list_engines),文本工具经 `run_tool` 通用分发不再逐个注册。
 3. **Capabilities 最小权限**:仅 `core:default` + `dialog:default` + `windows: ["main"]`,CSP 锁紧(`script-src 'self'`)。
 4. **Windows WebView2**:`skip` + 文档说明;不嵌 runtime。
 5. **体积优化**:release profile `lto`/`opt-level="z"`/`codegen-units=1`/`panic="abort"`/`strip`;前端 Svelte。

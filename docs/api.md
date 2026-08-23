@@ -1,8 +1,8 @@
 # 接口契约
 
 > Tauri command 契约:前端经 `@tauri-apps/api/core` 的 `invoke` 调用。无 HTTP API(桌面工具集)。
-> 命令在 `crates/tauri-app/src/commands.rs` 以 `#[tauri::command]` 声明,薄封装 `nextool-core`,共 38 个:
-> 4 通用入口(`list_tools`/`run_tool`/`list_file_tools`/`list_engines`)+ 34 文件命令(归档 4 / 图像 7 / PDF 12 / 字体 2 / SVG 1 / XLSX 2 / 引擎 6)。
+> 命令在 `crates/tauri-app/src/commands.rs` 以 `#[tauri::command]` 声明,薄封装 `nextool-core`,共 36 个:
+> 4 通用入口(`list_tools`/`run_tool`/`list_file_tools`/`list_engines`)+ 32 文件命令(通用转换 1 / 归档 4 / 图像 7 / PDF 12 / 字体 2 / SVG 1 / 电子表格 2 / 文本提取 1 / 引擎 2)。
 > 文本工具(107 个)不再各自独立 command,统一经 `run_tool(id, input, args)` 分发。
 > 前端参数以 camelCase 传入(Tauri 默认),Rust 侧 snake_case 接收。
 
@@ -55,7 +55,7 @@ interface ToolMetaDto {
 ```
 
 - `list_tools()`:返回全部文本工具元数据(107 项),前端按 `group` 分组渲染。
-- `list_file_tools()`:返回 34 个文件工具元数据(与独立 command 对齐),复用同一渲染逻辑。
+- `list_file_tools()`:返回 32 个文件工具元数据(与独立 command 对齐),复用同一渲染逻辑。
 - `list_engines()`:返回 6 个引擎的运行时探测状态(`EngineStatusDto`,已装/未装),供前端提示。
 - `run_tool(id, input, args)`:按 `id` 查 registry 分发,`args` 为 `Vec<(String,String)>`(前端传 `[[key,val],...]`)。未知 `id` 返回 `CmdError("未知工具: {id}")`。
 - `output_kind`:前端据此决定渲染——`text` 纯文本;`json`/`sql`/`xml`/`yaml`/`toml`/`css` 经 highlight.js 高亮;`svg` 直接渲染为 SVG。
@@ -133,16 +133,15 @@ interface ToolMetaDto {
 | `xlsx_to_json` | `input: string`, `output?: string` | 产物路径(JSON) | `InvalidInput`(格式)/`Io` |
 | `json_to_xlsx` | `input: string`, `output?: string` | 产物路径(XLSX) | `InvalidInput`(格式)/`Io` |
 
-### 引擎(6,运行时探测系统已装)
+### 引擎转换(运行时探测系统已装)
 
 | 命令 | 参数 | 返回 | 错误 |
 |---|---|---|---|
-| `av_convert` | `input`, `to: string`, `output?: string` | 产物路径 | `Other`(ffmpeg 未装/失败) |
-| `office_to_pdf` | `input: string` | 产物路径(PDF) | `Other`(LibreOffice 未装/失败) |
-| `ebook_convert` | `input`, `to: string`, `output?: string` | 产物路径 | `Other`(calibre 未装/失败) |
-| `markup_convert` | `input`, `to: string`, `output?: string` | 产物路径 | `Other`(pandoc 未装/失败) |
-| `pdf_compress` | `input: string`, `output?: string` | 产物路径(PDF) | `Other`(ghostscript 未装/失败) |
-| `ocr` | `input: string` | 产物路径(TXT) | `Other`(tesseract 未装/失败) |
+| `convert_file` | `path: string`, `target: string` | 产物路径 | `Other`(引擎未装/失败)/`InvalidInput`(格式不识别) |
+| `av_convert` | `path`, `to: string`, `output?: string` | 产物路径 | `Other`(ffmpeg 未装/失败) |
+| `ocr` | `path: string` | 产物路径(TXT) | `Other`(tesseract 未装/失败) |
+
+`convert_file` 通用入口按源格式自动路由:Office→LibreOffice、Markup→pandoc、Ebook→calibre、PDF→ghostscript(压缩)/纯 Rust(提取文本)/LibreOffice(其他)。图像/归档/字体/SVG 走专项命令。
 
 产物默认落源文件所在目录:解压/拆分到 `{stem}_extracted/`,压缩/转换到 `{stem}.{ext}`,碰撞追加 `_converted`→`(1)`→`(2)`(`create_new` 原子检查,不覆盖)。`output`/`outputDir` 省略时用默认。图像缩放 `width`/`height` 一维为 0 时按另一维等比;产物同源格式。PDF 加密用 AES(owner=user 同口令)。引擎命令统一经 `engine_convert_file` 落盘,未装引擎返回明确错误提示安装。
 
