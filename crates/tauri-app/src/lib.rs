@@ -6,9 +6,9 @@
 mod commands;
 
 use commands::{
-    archive_compress, archive_convert, archive_extract, archive_list, av_convert, docx_to_text,
-    ebook_convert, font_convert, font_meta, image_adjust, image_compress_jpeg, image_convert,
-    image_crop, image_filter, image_flip, image_resize, json_to_xlsx, list_engines,
+    archive_compress, archive_convert, archive_extract, archive_list, av_convert, convert_file,
+    docx_to_text, ebook_convert, font_convert, font_meta, image_adjust, image_compress_jpeg,
+    image_convert, image_crop, image_filter, image_flip, image_resize, json_to_xlsx, list_engines,
     list_file_tools, list_tools, markup_convert, ocr, office_to_pdf, pdf_add_page_numbers,
     pdf_compress, pdf_decrypt, pdf_delete_pages, pdf_encrypt, pdf_extract_pages, pdf_merge,
     pdf_rotate, pdf_set_metadata, pdf_split, pdf_split_every_n, pdf_split_parity, pdf_split_ranges,
@@ -26,6 +26,7 @@ pub fn run() {
             list_file_tools,
             list_engines,
             // 文件转换命令(签名各异,独立注册)
+            convert_file,
             archive_list,
             archive_extract,
             archive_compress,

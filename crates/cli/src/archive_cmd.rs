@@ -55,6 +55,8 @@ enum FileConvCmd {
         #[command(subcommand)]
         cmd: ExtractCmd,
     },
+    /// 通用文件转换:按源格式自动路由(Office→任意/MD→任意/电子书→任意/PDF→任意)
+    Convert { input: String, target: String },
 }
 
 #[derive(Subcommand)]
@@ -701,6 +703,12 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 Ok(())
             }
         },
+        FileConvCmd::Convert { input, target } => {
+            let out = nextool_core::convert_any(&input, &target, &nextool_core::SubprocessRunner)
+                .map_err(|e| e.to_string())?;
+            println!("已转换 {out}");
+            Ok(())
+        }
     }
 }
 

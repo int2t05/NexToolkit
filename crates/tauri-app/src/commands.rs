@@ -140,6 +140,38 @@ pub fn list_engines() -> Vec<EngineStatusDto> {
 /// params 的 key 用 camelCase,经 Tauri 映射到 Rust 命令的 snake_case 形参。
 static FILE_TOOLS: &[ToolMeta] = &[
     ToolMeta {
+        id: "convert_file",
+        name: "文件转换",
+        desc: "通用格式转换(Office/MD/电子书/PDF → 任意格式)",
+        group: "fileconv",
+        params: &[
+            ParamSpec {
+                key: "path",
+                kind: ParamKind::File,
+                label: "源文件",
+                default: None,
+                options: &[],
+                placeholder: None,
+                multiple: false,
+            },
+            ParamSpec {
+                key: "target",
+                kind: ParamKind::Select,
+                label: "目标格式",
+                default: Some("pdf"),
+                options: &[
+                    "pdf", "docx", "doc", "xlsx", "xls", "pptx", "odt", "ods", "odp", "rtf",
+                    "html", "md", "txt", "rst", "adoc", "org", "tex", "wiki", "epub", "mobi",
+                    "azw3", "csv", "json", "yaml", "xml", "png", "jpg", "webp",
+                ],
+                placeholder: None,
+                multiple: false,
+            },
+        ],
+        needs_main_input: false,
+        output_kind: OutputKind::Text,
+    },
+    ToolMeta {
         id: "archive_list",
         name: "归档列表",
         desc: "列出归档内文件(zip/tar/gz/7z/bz2/xz/zst)",
@@ -1680,4 +1712,14 @@ pub fn pdf_to_text(input: String, output: Option<String>) -> CmdResult<String> {
 #[tauri::command]
 pub fn docx_to_text(input: String, output: Option<String>) -> CmdResult<String> {
     Ok(nextool_core::docx_to_text_file(&input, output.as_deref())?)
+}
+
+/// 通用文件转换:按源格式自动路由(Office/MD/电子书/PDF → 任意目标格式)
+#[tauri::command]
+pub fn convert_file(input: String, target: String) -> CmdResult<String> {
+    Ok(nextool_core::convert_any(
+        &input,
+        &target,
+        &nextool_core::SubprocessRunner,
+    )?)
 }

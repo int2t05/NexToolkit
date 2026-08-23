@@ -9,6 +9,7 @@
 
 pub mod engine;
 pub mod path;
+pub mod route;
 
 #[cfg(feature = "archive")]
 pub mod archive;
@@ -35,6 +36,7 @@ pub mod xlsx;
 
 pub use engine::*;
 pub use path::*;
+pub use route::{convert_any, detect_family, FormatFamily};
 
 #[cfg(feature = "archive")]
 pub use archive::*;

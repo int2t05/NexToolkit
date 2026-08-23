@@ -105,6 +105,7 @@ export const SUBGROUPS: SubCategory[] = [
   { id: 'time', parent: 'nettime', label: { zh: '时间', en: 'Time' } },
   // fileconv
   { id: 'archive', parent: 'fileconv', label: { zh: '归档', en: 'Archive' } },
+  { id: 'convert-any', parent: 'fileconv', label: { zh: '通用转换', en: 'Convert' } },
   { id: 'image-fmt', parent: 'fileconv', label: { zh: '图像格式', en: 'Image Format' } },
   { id: 'image-edit', parent: 'fileconv', label: { zh: '图像处理', en: 'Image Edit' } },
   { id: 'pdf-page', parent: 'fileconv', label: { zh: 'PDF 页面', en: 'PDF Pages' } },
@@ -179,6 +180,7 @@ export const SUBCATEGORY: Record<string, string> = {
   timestamp_to_human: 'time', timestamp_from_human: 'time', cron_next: 'time',
   // fileconv
   archive_list: 'archive', archive_extract: 'archive', archive_compress: 'archive', archive_convert: 'archive',
+  convert_file: 'convert-any',
   image_convert: 'image-fmt', image_resize: 'image-fmt',
   image_crop: 'image-edit', image_flip: 'image-edit', image_filter: 'image-edit',
   image_adjust: 'image-edit', image_compress_jpeg: 'image-edit',
