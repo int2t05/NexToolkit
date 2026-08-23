@@ -123,11 +123,11 @@ fn convert_pdf_to_text_empty_pdf_reports_error() {
 
 #[test]
 fn convert_pdf_to_text_with_content() {
-    // 需 pandoc 造带文本的 PDF
+    // 需 pandoc 造带文本的 PDF(ASCII 内容,pdflatex 不支持 CJK)
     require_engine!("pandoc");
     let dir = tempdir().unwrap();
     let md = dir.path().join("src.md");
-    fs::write(&md, "# 有文本的 PDF\n\n正文内容 here\n").unwrap();
+    fs::write(&md, "# Text PDF\n\nBody content here\n").unwrap();
     nextool()
         .args(["file-conv", "convert"])
         .arg(&md)
@@ -223,6 +223,7 @@ fn convert_md_to_docx() {
 // ---- DOCX → PDF(LibreOffice,需先 pandoc 造 docx)----
 
 #[test]
+#[ignore = "LibreOffice headless 首次启动慢,手动跑:cargo test -p nextool-cli --test convert_e2e convert_docx_to_pdf -- --ignored"]
 fn convert_docx_to_pdf() {
     require_engine!("soffice");
     require_engine!("pandoc");
