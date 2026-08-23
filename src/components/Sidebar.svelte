@@ -168,7 +168,7 @@
   {/if}
 
   <div class="sidebar-footer">
-    <span class="ver">v0.3.0</span>
+    <span class="ver">v0.4.0</span>
   </div>
 </nav>
 
