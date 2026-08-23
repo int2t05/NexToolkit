@@ -24,3 +24,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# E2E 测试产物(留痕,不入库;report.md 每次重新生成)
+tests/output/
