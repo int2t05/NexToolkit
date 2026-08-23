@@ -7,12 +7,12 @@ mod commands;
 
 use commands::{
     archive_compress, archive_convert, archive_extract, archive_list, av_convert, convert_file,
-    docx_to_text, ebook_convert, font_convert, font_meta, image_adjust, image_compress_jpeg,
-    image_convert, image_crop, image_filter, image_flip, image_resize, json_to_xlsx, list_engines,
-    list_file_tools, list_tools, markup_convert, ocr, office_to_pdf, pdf_add_page_numbers,
-    pdf_compress, pdf_decrypt, pdf_delete_pages, pdf_encrypt, pdf_extract_pages, pdf_merge,
-    pdf_rotate, pdf_set_metadata, pdf_split, pdf_split_every_n, pdf_split_parity, pdf_split_ranges,
-    pdf_to_text, run_tool, svg_convert, xlsx_to_json,
+    docx_to_text, engine_install_infos, font_convert, font_meta, image_adjust, image_compress_jpeg,
+    image_convert, image_crop, image_filter, image_flip, image_resize, install_engine,
+    json_to_xlsx, list_engines, list_file_tools, list_tools, ocr, pdf_add_page_numbers,
+    pdf_decrypt, pdf_delete_pages, pdf_encrypt, pdf_extract_pages, pdf_merge, pdf_rotate,
+    pdf_set_metadata, pdf_split, pdf_split_every_n, pdf_split_parity, pdf_split_ranges, run_tool,
+    svg_convert, xlsx_to_json,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,6 +25,8 @@ pub fn run() {
             run_tool,
             list_file_tools,
             list_engines,
+            engine_install_infos,
+            install_engine,
             // 文件转换命令(签名各异,独立注册)
             convert_file,
             archive_list,
@@ -57,16 +59,11 @@ pub fn run() {
             svg_convert,
             // 引擎转换(运行时探测系统已装引擎)
             av_convert,
-            office_to_pdf,
-            ebook_convert,
-            markup_convert,
-            pdf_compress,
             ocr,
             // 电子表格
             xlsx_to_json,
             json_to_xlsx,
             // 文本提取
-            pdf_to_text,
             docx_to_text,
         ])
         .run(tauri::generate_context!())

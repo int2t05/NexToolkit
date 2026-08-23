@@ -119,6 +119,7 @@ pub struct EngineStatusDto {
     pub binary: String,
     pub desc: String,
     pub available: bool,
+    pub resolved_path: Option<String>,
 }
 
 /// 探测所有引擎可用性(ffmpeg/LibreOffice/calibre/pandoc/Ghostscript/tesseract)
@@ -130,8 +131,42 @@ pub fn list_engines() -> Vec<EngineStatusDto> {
             binary: s.binary.into(),
             desc: s.desc.into(),
             available: s.available,
+            resolved_path: s.resolved_path,
         })
         .collect()
+}
+
+#[derive(serde::Serialize)]
+pub struct EngineInstallInfoDto {
+    pub binary: String,
+    pub desc: String,
+    pub available: bool,
+    pub is_portable: bool,
+    pub download_url: String,
+    pub install_path: Option<String>,
+}
+
+/// 返回所有引擎的安装信息(是否便携版/下载 URL/安装路径)
+#[tauri::command]
+pub fn engine_install_infos() -> Vec<EngineInstallInfoDto> {
+    nextool_core::engine_install_infos()
+        .into_iter()
+        .map(|i| EngineInstallInfoDto {
+            binary: i.binary.into(),
+            desc: i.desc.into(),
+            available: i.available,
+            is_portable: i.is_portable,
+            download_url: i.download_url.into(),
+            install_path: i.install_path,
+        })
+        .collect()
+}
+
+/// 下载并安装便携版引擎(仅 ffmpeg/pandoc),返回安装路径
+#[tauri::command]
+pub fn install_engine(engine: String) -> CmdResult<String> {
+    let eng = nextool_core::parse_engine(&engine)?;
+    Ok(nextool_core::install_engine(eng)?)
 }
 
 /// 文件工具静态元数据(list_file_tools 返回,前端动态渲染)
@@ -936,7 +971,7 @@ static FILE_TOOLS: &[ToolMeta] = &[
     ToolMeta {
         id: "font_convert",
         name: "字体转换",
-        desc: "TTF/OTF↔WOFF 互转",
+        desc: "TTF↔WOFF 互转",
         group: "fileconv",
         params: &[
             ParamSpec {
@@ -1064,125 +1099,6 @@ static FILE_TOOLS: &[ToolMeta] = &[
         output_kind: OutputKind::Text,
     },
     ToolMeta {
-        id: "office_to_pdf",
-        name: "Office 转 PDF",
-        desc: "LibreOffice(docx/xlsx/pptx→pdf)",
-        group: "fileconv",
-        params: &[ParamSpec {
-            key: "path",
-            kind: ParamKind::File,
-            label: "Office 文档",
-            default: None,
-            options: &[],
-            placeholder: None,
-            multiple: false,
-        }],
-        needs_main_input: false,
-        output_kind: OutputKind::Text,
-    },
-    ToolMeta {
-        id: "ebook_convert",
-        name: "电子书转换",
-        desc: "calibre(epub/mobi/pdf 互转)",
-        group: "fileconv",
-        params: &[
-            ParamSpec {
-                key: "path",
-                kind: ParamKind::File,
-                label: "电子书文件",
-                default: None,
-                options: &[],
-                placeholder: None,
-                multiple: false,
-            },
-            ParamSpec {
-                key: "to",
-                kind: ParamKind::Select,
-                label: "目标格式",
-                default: Some("epub"),
-                options: &["epub", "mobi", "pdf", "txt", "azw3"],
-                placeholder: None,
-                multiple: false,
-            },
-            ParamSpec {
-                key: "output",
-                kind: ParamKind::Text,
-                label: "输出路径",
-                default: None,
-                options: &[],
-                placeholder: Some("默认源文件旁"),
-                multiple: false,
-            },
-        ],
-        needs_main_input: false,
-        output_kind: OutputKind::Text,
-    },
-    ToolMeta {
-        id: "markup_convert",
-        name: "标记语言转换",
-        desc: "pandoc(md/html/rst/adoc/org/tex 互转)",
-        group: "fileconv",
-        params: &[
-            ParamSpec {
-                key: "path",
-                kind: ParamKind::File,
-                label: "标记文件",
-                default: None,
-                options: &[],
-                placeholder: None,
-                multiple: false,
-            },
-            ParamSpec {
-                key: "to",
-                kind: ParamKind::Select,
-                label: "目标格式",
-                default: Some("html"),
-                options: &["html", "md", "rst", "adoc", "org", "tex", "docx"],
-                placeholder: None,
-                multiple: false,
-            },
-            ParamSpec {
-                key: "output",
-                kind: ParamKind::Text,
-                label: "输出路径",
-                default: None,
-                options: &[],
-                placeholder: Some("默认源文件旁"),
-                multiple: false,
-            },
-        ],
-        needs_main_input: false,
-        output_kind: OutputKind::Text,
-    },
-    ToolMeta {
-        id: "pdf_compress",
-        name: "PDF 压缩",
-        desc: "Ghostscript 优化(输出 _converted.pdf)",
-        group: "fileconv",
-        params: &[
-            ParamSpec {
-                key: "path",
-                kind: ParamKind::File,
-                label: "PDF 文件",
-                default: None,
-                options: &[],
-                placeholder: None,
-                multiple: false,
-            },
-            ParamSpec {
-                key: "output",
-                kind: ParamKind::Text,
-                label: "输出路径",
-                default: None,
-                options: &[],
-                placeholder: Some("默认源文件旁 _converted.pdf"),
-                multiple: false,
-            },
-        ],
-        needs_main_input: false,
-        output_kind: OutputKind::Text,
-    },
-    ToolMeta {
         id: "ocr",
         name: "OCR 识别",
         desc: "tesseract 图片转文本",
@@ -1252,23 +1168,6 @@ static FILE_TOOLS: &[ToolMeta] = &[
                 multiple: false,
             },
         ],
-        needs_main_input: false,
-        output_kind: OutputKind::Text,
-    },
-    ToolMeta {
-        id: "pdf_to_text",
-        name: "PDF 提取文本",
-        desc: "PDF 转纯文本",
-        group: "fileconv",
-        params: &[ParamSpec {
-            key: "path",
-            kind: ParamKind::File,
-            label: "PDF 文件",
-            default: None,
-            options: &[],
-            placeholder: None,
-            multiple: false,
-        }],
         needs_main_input: false,
         output_kind: OutputKind::Text,
     },
@@ -1620,9 +1519,9 @@ pub fn svg_convert(path: String, target: String, output: Option<String>) -> CmdR
 
 /// 音视频转换(ffmpeg,运行时探测);返回产物路径
 #[tauri::command]
-pub fn av_convert(input: String, to: String, output: Option<String>) -> CmdResult<String> {
+pub fn av_convert(path: String, to: String, output: Option<String>) -> CmdResult<String> {
     Ok(nextool_core::engine_convert_file(
-        &input,
+        &path,
         nextool_core::Engine::Ffmpeg,
         &to,
         output.as_deref(),
@@ -1630,59 +1529,11 @@ pub fn av_convert(input: String, to: String, output: Option<String>) -> CmdResul
     )?)
 }
 
-/// Office 文档转 PDF(LibreOffice,输出源文件旁);返回产物路径
-#[tauri::command]
-pub fn office_to_pdf(input: String) -> CmdResult<String> {
-    Ok(nextool_core::engine_convert_file(
-        &input,
-        nextool_core::Engine::LibreOffice,
-        "pdf",
-        None,
-        &nextool_core::SubprocessRunner,
-    )?)
-}
-
-/// 电子书转换(calibre,运行时探测);返回产物路径
-#[tauri::command]
-pub fn ebook_convert(input: String, to: String, output: Option<String>) -> CmdResult<String> {
-    Ok(nextool_core::engine_convert_file(
-        &input,
-        nextool_core::Engine::Calibre,
-        &to,
-        output.as_deref(),
-        &nextool_core::SubprocessRunner,
-    )?)
-}
-
-/// 标记语言转换(pandoc,运行时探测);返回产物路径
-#[tauri::command]
-pub fn markup_convert(input: String, to: String, output: Option<String>) -> CmdResult<String> {
-    Ok(nextool_core::engine_convert_file(
-        &input,
-        nextool_core::Engine::Pandoc,
-        &to,
-        output.as_deref(),
-        &nextool_core::SubprocessRunner,
-    )?)
-}
-
-/// PDF 压缩优化(Ghostscript,输出源文件旁 _converted.pdf);返回产物路径
-#[tauri::command]
-pub fn pdf_compress(input: String, output: Option<String>) -> CmdResult<String> {
-    Ok(nextool_core::engine_convert_file(
-        &input,
-        nextool_core::Engine::Ghostscript,
-        "pdf",
-        output.as_deref(),
-        &nextool_core::SubprocessRunner,
-    )?)
-}
-
 /// OCR 图片转文本(tesseract,输出源文件旁 .txt);返回产物路径
 #[tauri::command]
-pub fn ocr(input: String) -> CmdResult<String> {
+pub fn ocr(path: String) -> CmdResult<String> {
     Ok(nextool_core::engine_convert_file(
-        &input,
+        &path,
         nextool_core::Engine::Tesseract,
         "txt",
         None,
@@ -1692,33 +1543,27 @@ pub fn ocr(input: String) -> CmdResult<String> {
 
 /// XLSX → JSON(首个 sheet 转二维数组,输出源文件旁 .json);返回产物路径
 #[tauri::command]
-pub fn xlsx_to_json(input: String, output: Option<String>) -> CmdResult<String> {
-    Ok(nextool_core::xlsx_to_json_file(&input, output.as_deref())?)
+pub fn xlsx_to_json(path: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::xlsx_to_json_file(&path, output.as_deref())?)
 }
 
 /// JSON → XLSX(二维数组写首个 sheet,输出源文件旁 .xlsx);返回产物路径
 #[tauri::command]
-pub fn json_to_xlsx(input: String, output: Option<String>) -> CmdResult<String> {
-    Ok(nextool_core::json_to_xlsx_file(&input, output.as_deref())?)
-}
-
-/// PDF → TXT(纯文本提取,输出源文件旁 .txt);返回产物路径
-#[tauri::command]
-pub fn pdf_to_text(input: String, output: Option<String>) -> CmdResult<String> {
-    Ok(nextool_core::pdf_to_text_file(&input, output.as_deref())?)
+pub fn json_to_xlsx(path: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::json_to_xlsx_file(&path, output.as_deref())?)
 }
 
 /// DOCX → TXT(Word 文档文本提取,输出源文件旁 .txt);返回产物路径
 #[tauri::command]
-pub fn docx_to_text(input: String, output: Option<String>) -> CmdResult<String> {
-    Ok(nextool_core::docx_to_text_file(&input, output.as_deref())?)
+pub fn docx_to_text(path: String, output: Option<String>) -> CmdResult<String> {
+    Ok(nextool_core::docx_to_text_file(&path, output.as_deref())?)
 }
 
 /// 通用文件转换:按源格式自动路由(Office/MD/电子书/PDF → 任意目标格式)
 #[tauri::command]
-pub fn convert_file(input: String, target: String) -> CmdResult<String> {
+pub fn convert_file(path: String, target: String) -> CmdResult<String> {
     Ok(nextool_core::convert_any(
-        &input,
+        &path,
         &target,
         &nextool_core::SubprocessRunner,
     )?)

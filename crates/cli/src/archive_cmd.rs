@@ -40,7 +40,7 @@ enum FileConvCmd {
         #[command(subcommand)]
         cmd: SvgCmd,
     },
-    /// 引擎转换:音视频/Office/电子书/标记/PDF压缩/OCR(运行时探测系统已装引擎)
+    /// 引擎转换:音视频/OCR(运行时探测系统已装引擎)
     Engine {
         #[command(subcommand)]
         cmd: EngineCmd,
@@ -50,7 +50,7 @@ enum FileConvCmd {
         #[command(subcommand)]
         cmd: XlsxCmd,
     },
-    /// 文本提取:PDF/DOCX → TXT
+    /// 文本提取:DOCX → TXT
     Extract {
         #[command(subcommand)]
         cmd: ExtractCmd,
@@ -266,35 +266,15 @@ enum ArchiveCmd {
 enum EngineCmd {
     /// 列出所有引擎及可用性(探测系统已装)
     List,
+    /// 详细检查:每引擎状态 + 路径 + 是否便携版
+    Check,
+    /// 安装便携版引擎(ffmpeg/pandoc,自动下载解压)
+    Install { engine: String },
     /// 音视频转换(ffmpeg,--to 指定目标格式如 mp3/wav/aac/mp4)
     Av {
         input: String,
         #[arg(long)]
         to: String,
-        #[arg(long)]
-        output: Option<String>,
-    },
-    /// Office 文档转 PDF(LibreOffice,输出源文件旁)
-    OfficeToPdf { input: String },
-    /// 电子书转换(calibre,--to 指定目标格式如 epub/mobi/pdf)
-    Ebook {
-        input: String,
-        #[arg(long)]
-        to: String,
-        #[arg(long)]
-        output: Option<String>,
-    },
-    /// 标记语言转换(pandoc,--to 指定目标格式如 html/rst/adoc/org/tex)
-    Markup {
-        input: String,
-        #[arg(long)]
-        to: String,
-        #[arg(long)]
-        output: Option<String>,
-    },
-    /// PDF 压缩优化(Ghostscript,输出源文件旁 _converted.pdf)
-    PdfCompress {
-        input: String,
         #[arg(long)]
         output: Option<String>,
     },
@@ -320,12 +300,6 @@ enum XlsxCmd {
 
 #[derive(Subcommand)]
 enum ExtractCmd {
-    /// PDF → TXT(纯文本提取)
-    Pdf {
-        input: String,
-        #[arg(long)]
-        output: Option<String>,
-    },
     /// DOCX → TXT(Word 文档文本提取)
     Docx {
         input: String,
@@ -602,6 +576,38 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 println!("已装 {avail}/{} 个引擎", statuses.len());
                 Ok(())
             }
+            EngineCmd::Check => {
+                let infos = nextool_core::engine_install_infos();
+                for i in &infos {
+                    let mark = if i.available { "✓" } else { "✗" };
+                    let path = i.install_path.as_deref().unwrap_or(if i.is_portable {
+                        "未安装(便携版,可自动安装)"
+                    } else {
+                        "未安装(安装包,请手动下载安装)"
+                    });
+                    let portable_tag = if i.is_portable {
+                        "[便携]"
+                    } else {
+                        "[安装包]"
+                    };
+                    println!(
+                        "{mark} {:<14} {:<8} {}  {}",
+                        i.binary, portable_tag, i.desc, path
+                    );
+                }
+                let avail = infos.iter().filter(|i| i.available).count();
+                println!("\n已装 {avail}/{} 个引擎", infos.len());
+                if infos.iter().any(|i| !i.available && i.is_portable) {
+                    println!("可自动安装:nextool file-conv engine install <引擎名>");
+                }
+                Ok(())
+            }
+            EngineCmd::Install { engine } => {
+                let eng = nextool_core::parse_engine(&engine).map_err(|e| e.to_string())?;
+                let path = nextool_core::install_engine(eng).map_err(|e| e.to_string())?;
+                println!("已安装 {}: {path}", eng.binary());
+                Ok(())
+            }
             EngineCmd::Av { input, to, output } => {
                 let out = nextool_core::engine_convert_file(
                     &input,
@@ -612,54 +618,6 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 )
                 .map_err(|e| e.to_string())?;
                 println!("已转换 {out}");
-                Ok(())
-            }
-            EngineCmd::OfficeToPdf { input } => {
-                let out = nextool_core::engine_convert_file(
-                    &input,
-                    nextool_core::Engine::LibreOffice,
-                    "pdf",
-                    None,
-                    &nextool_core::SubprocessRunner,
-                )
-                .map_err(|e| e.to_string())?;
-                println!("已转换 {out}");
-                Ok(())
-            }
-            EngineCmd::Ebook { input, to, output } => {
-                let out = nextool_core::engine_convert_file(
-                    &input,
-                    nextool_core::Engine::Calibre,
-                    &to,
-                    output.as_deref(),
-                    &nextool_core::SubprocessRunner,
-                )
-                .map_err(|e| e.to_string())?;
-                println!("已转换 {out}");
-                Ok(())
-            }
-            EngineCmd::Markup { input, to, output } => {
-                let out = nextool_core::engine_convert_file(
-                    &input,
-                    nextool_core::Engine::Pandoc,
-                    &to,
-                    output.as_deref(),
-                    &nextool_core::SubprocessRunner,
-                )
-                .map_err(|e| e.to_string())?;
-                println!("已转换 {out}");
-                Ok(())
-            }
-            EngineCmd::PdfCompress { input, output } => {
-                let out = nextool_core::engine_convert_file(
-                    &input,
-                    nextool_core::Engine::Ghostscript,
-                    "pdf",
-                    output.as_deref(),
-                    &nextool_core::SubprocessRunner,
-                )
-                .map_err(|e| e.to_string())?;
-                println!("已压缩 {out}");
                 Ok(())
             }
             EngineCmd::Ocr { input } => {
@@ -690,12 +648,6 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
             }
         },
         FileConvCmd::Extract { cmd } => match cmd {
-            ExtractCmd::Pdf { input, output } => {
-                let out = nextool_core::pdf_to_text_file(&input, output.as_deref())
-                    .map_err(|e| e.to_string())?;
-                println!("已提取 {out}");
-                Ok(())
-            }
             ExtractCmd::Docx { input, output } => {
                 let out = nextool_core::docx_to_text_file(&input, output.as_deref())
                     .map_err(|e| e.to_string())?;
