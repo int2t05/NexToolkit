@@ -4,10 +4,10 @@ use crate::registry::{OutputKind, ParamKind, ParamSpec, Tool, ToolArgs, ToolMeta
 
 use super::{
     base32_decode, base32_encode, base58_decode, base58_encode, base64_decode, base64_encode,
-    base85_decode, base85_encode, braille_decode, braille_encode, hex_decode, hex_encode,
-    html_decode, html_encode, jwt_decode, jwt_verify, morse_decode, morse_encode, punycode_decode,
-    punycode_encode, quoted_printable_decode, quoted_printable_encode, url_decode, url_encode,
-    zero_width_decode, zero_width_encode,
+    base85_decode, base85_encode, braille_decode, braille_encode, charset_decode, charset_encode,
+    hex_decode, hex_encode, html_decode, html_encode, jwt_decode, jwt_verify, morse_decode,
+    morse_encode, punycode_decode, punycode_encode, quoted_printable_decode,
+    quoted_printable_encode, url_decode, url_encode, zero_width_decode, zero_width_encode,
 };
 
 pub struct Base64Encode;
@@ -510,5 +510,83 @@ impl Tool for ZeroWidthDecode {
     }
     fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
         zero_width_decode(input)
+    }
+}
+
+pub struct CharsetEncode;
+impl Tool for CharsetEncode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "charset_encode",
+            name: "字符编码",
+            desc: "文本 → 指定字符集(GBK/Big5/Shift_JIS 等)hex 字节",
+            group: "encode",
+            params: &[ParamSpec {
+                key: "charset",
+                kind: ParamKind::Select,
+                label: "字符集",
+                default: Some("gbk"),
+                options: &[
+                    "utf-8",
+                    "gbk",
+                    "gb2312",
+                    "gb18030",
+                    "big5",
+                    "shift_jis",
+                    "euc-jp",
+                    "euc-kr",
+                    "iso-8859-1",
+                    "windows-1252",
+                ],
+                placeholder: None,
+                multiple: false,
+            }],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, args: &ToolArgs) -> crate::ToolResult<String> {
+        let charset = args.get("charset").unwrap_or("gbk");
+        charset_encode(input, charset)
+    }
+}
+
+pub struct CharsetDecode;
+impl Tool for CharsetDecode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "charset_decode",
+            name: "字符解码",
+            desc: "hex 字节 → 指定字符集文本(GBK/Big5/Shift_JIS 等)",
+            group: "encode",
+            params: &[ParamSpec {
+                key: "charset",
+                kind: ParamKind::Select,
+                label: "字符集",
+                default: Some("gbk"),
+                options: &[
+                    "utf-8",
+                    "gbk",
+                    "gb2312",
+                    "gb18030",
+                    "big5",
+                    "shift_jis",
+                    "euc-jp",
+                    "euc-kr",
+                    "iso-8859-1",
+                    "windows-1252",
+                ],
+                placeholder: None,
+                multiple: false,
+            }],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, args: &ToolArgs) -> crate::ToolResult<String> {
+        let charset = args.get("charset").unwrap_or("gbk");
+        charset_decode(input, charset)
     }
 }

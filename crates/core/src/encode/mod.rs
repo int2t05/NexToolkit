@@ -627,6 +627,50 @@ pub fn zero_width_decode(input: &str) -> ToolResult<String> {
     String::from_utf8(bytes).map_err(ToolError::from)
 }
 
+// ---- 字符编码转换(charset:UTF-8/GBK/Big5/Shift_JIS 等)----
+
+/// 支持的字符编码列表
+pub const CHARSET_OPTIONS: &[&str] = &[
+    "utf-8",
+    "gbk",
+    "gb2312",
+    "gb18030",
+    "big5",
+    "shift_jis",
+    "euc-jp",
+    "euc-kr",
+    "iso-8859-1",
+    "windows-1252",
+];
+
+/// 字符串按 charset 编码为字节,返回 hex 字符串(便于展示与传输)
+pub fn charset_encode(input: &str, charset: &str) -> ToolResult<String> {
+    let encoding = encoding_rs::Encoding::for_label(charset.as_bytes())
+        .ok_or_else(|| ToolError::InvalidInput(format!("不支持的字符编码: {charset}")))?;
+    let (bytes, _, _) = encoding.encode(input);
+    Ok(bytes.iter().map(|b| format!("{b:02X}")).collect())
+}
+
+/// hex 字符串按 charset 解码为字符串
+pub fn charset_decode(input: &str, charset: &str) -> ToolResult<String> {
+    let hex: Vec<u8> = input
+        .split_whitespace()
+        .flat_map(|chunk| {
+            chunk
+                .as_bytes()
+                .chunks(2)
+                .filter(|c| c.len() == 2)
+                .map(|c| u8::from_str_radix(std::str::from_utf8(c).unwrap_or(""), 16))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Result<_, _>>()
+        .map_err(|e| ToolError::Parse(format!("hex 解析失败: {e}")))?;
+    let encoding = encoding_rs::Encoding::for_label(charset.as_bytes())
+        .ok_or_else(|| ToolError::InvalidInput(format!("不支持的字符编码: {charset}")))?;
+    let (cow, _, _) = encoding.decode(&hex);
+    Ok(cow.into_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1222,5 +1266,27 @@ mod tests {
     fn zero_width_decode_invalid() {
         // 零宽字符数非 8 的倍数
         assert!(zero_width_decode("\u{200B}").is_err());
+    }
+
+    #[test]
+    fn charset_encode_gbk() {
+        // "中文" GBK 编码 = D6 D0 CE C4
+        assert_eq!(charset_encode("中文", "gbk").unwrap(), "D6D0CEC4");
+    }
+
+    #[test]
+    fn charset_decode_gbk() {
+        assert_eq!(charset_decode("D6D0 CEC4", "gbk").unwrap(), "中文");
+    }
+
+    #[test]
+    fn charset_roundtrip_utf8() {
+        let hex = charset_encode("Hello 中文", "utf-8").unwrap();
+        assert_eq!(charset_decode(&hex, "utf-8").unwrap(), "Hello 中文");
+    }
+
+    #[test]
+    fn charset_unsupported() {
+        assert!(charset_encode("test", "xxx").is_err());
     }
 }

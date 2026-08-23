@@ -136,6 +136,8 @@ pub fn tools() -> &'static [&'static dyn Tool] {
         &crate::encode::BrailleDecode,
         &crate::encode::ZeroWidthEncode,
         &crate::encode::ZeroWidthDecode,
+        &crate::encode::CharsetEncode,
+        &crate::encode::CharsetDecode,
         // convert
         &crate::convert::JsonToYaml,
         &crate::convert::YamlToJson,

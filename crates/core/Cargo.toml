@@ -21,6 +21,7 @@ hex = "0.4"
 bs58 = "0.5"
 punycode = "0.4"
 quoted_printable = "0.5"
+encoding_rs = "0.8"
 
 # convert
 serde_yaml = "0.9"

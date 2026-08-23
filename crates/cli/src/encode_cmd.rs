@@ -36,6 +36,16 @@ enum EncodeCmd {
     Braille { mode: Mode, input: Option<String> },
     /// 零宽字符隐写编解码
     ZeroWidth { mode: Mode, input: Option<String> },
+    /// 字符编码转换:文本 → 指定字符集 hex(GBK/Big5/Shift_JIS 等)
+    Charset {
+        mode: Mode,
+        #[arg(
+            long,
+            help = "字符集:utf-8/gbk/gb2312/gb18030/big5/shift_jis/euc-jp/euc-kr/iso-8859-1/windows-1252"
+        )]
+        charset: String,
+        input: Option<String>,
+    },
     /// JWT 解码(不验签,输出 header/payload JSON)
     Jwt { input: Option<String> },
     /// JWT 验签:--key(HS256 secret 或 RS256 公钥 PEM),通过输出 payload JSON
@@ -124,6 +134,16 @@ pub fn run(args: EncodeArgs) -> Result<(), String> {
             print_text(input, |s| match mode {
                 Mode::Encode => nextool_core::zero_width_encode(s),
                 Mode::Decode => nextool_core::zero_width_decode(s),
+            })?;
+        }
+        EncodeCmd::Charset {
+            mode,
+            charset,
+            input,
+        } => {
+            print_text(input, |s| match mode {
+                Mode::Encode => nextool_core::charset_encode(s, &charset),
+                Mode::Decode => nextool_core::charset_decode(s, &charset),
             })?;
         }
         EncodeCmd::Jwt { input } => print_text(input, nextool_core::jwt_decode)?,
