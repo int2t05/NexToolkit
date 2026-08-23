@@ -128,6 +128,9 @@ fn archive_ext(fmt: ArchiveFormat) -> &'static str {
         ArchiveFormat::TarGz => "tar.gz",
         ArchiveFormat::Gz => "gz",
         ArchiveFormat::SevenZ => "7z",
+        ArchiveFormat::Bz2 => "bz2",
+        ArchiveFormat::Xz => "xz",
+        ArchiveFormat::Zst => "zst",
     }
 }
 
@@ -171,6 +174,74 @@ pub fn resize_image_file(
     write_output(&out_data, input, output, fmt.ext())
 }
 
+/// 图像裁剪并落盘(默认输出到源文件旁,同格式),返回产物路径
+#[cfg(feature = "image")]
+pub fn crop_image_file(
+    input: &str,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_crop(&data, x, y, width, height, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
+}
+
+/// 图像翻转并落盘(默认输出到源文件旁,同格式),返回产物路径
+#[cfg(feature = "image")]
+pub fn flip_image_file(
+    input: &str,
+    direction: super::image::FlipDirection,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_flip(&data, direction, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
+}
+
+/// 图像滤镜并落盘(默认输出到源文件旁,同格式),返回产物路径
+#[cfg(feature = "image")]
+pub fn filter_image_file(
+    input: &str,
+    filter: super::image::FilterKind,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_filter(&data, filter, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
+}
+
+/// 亮度/对比度调整并落盘(默认输出到源文件旁,同格式),返回产物路径
+#[cfg(feature = "image")]
+pub fn adjust_image_file(
+    input: &str,
+    brightness: i32,
+    contrast: f32,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let fmt = super::detect_image_format(&data)?;
+    let out_data = super::image_adjust(&data, brightness, contrast, fmt)?;
+    write_output(&out_data, input, output, fmt.ext())
+}
+
+/// JPEG 压缩并落盘(输出 JPEG 格式,默认源文件旁 .jpg),返回产物路径
+#[cfg(feature = "image")]
+pub fn compress_jpeg_image_file(
+    input: &str,
+    quality: u8,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::image_compress_jpeg(&data, quality)?;
+    write_output(&out_data, input, output, "jpg")
+}
+
 // ---- PDF IO(pdf feature)----
 
 /// 拆分 PDF:每页一个独立 PDF,输出到源文件旁 `{stem}_split_{n}.pdf`,返回产物路径列表
@@ -178,6 +249,18 @@ pub fn resize_image_file(
 pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String>> {
     let data = std::fs::read(input)?;
     let parts = super::pdf_split(&data)?;
+    write_split_parts(&parts, input, output_dir)
+}
+
+/// 拆分产物批量落盘:到 `output_dir` 或源文件旁 `{stem}_extracted/`,命名 `{stem}_split_{n}.pdf`
+///
+/// 碰撞追加 `(1)`/`(2)`(经 [`write_bytes_safe`])。供 [`split_pdf`] 与范围/每 N 页拆分复用。
+#[cfg(feature = "pdf")]
+fn write_split_parts(
+    parts: &[Vec<u8>],
+    input: &str,
+    output_dir: Option<&str>,
+) -> ToolResult<Vec<String>> {
     if parts.is_empty() {
         return Ok(Vec::new());
     }
@@ -194,7 +277,7 @@ pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String
         .unwrap_or_else(|| "split".into());
     let mut written = Vec::with_capacity(parts.len());
     for (i, part) in parts.iter().enumerate() {
-        // 碰撞:_split_0 → _split_0(1) ...
+        // 碰撞:_split_1 → _split_1(1) ...
         let base = format!("{dir}/{}_split_{}", stem, i + 1);
         let path = write_bytes_safe(part, &format!("{base}.pdf"), "pdf")?;
         written.push(path);
@@ -202,11 +285,13 @@ pub fn split_pdf(input: &str, output_dir: Option<&str>) -> ToolResult<Vec<String
     Ok(written)
 }
 
-/// 旋转 PDF 并落盘(默认输出到源文件旁),返回产物路径
+/// 旋转 PDF 指定角度并落盘(默认输出到源文件旁),返回产物路径
+///
+/// `degrees` 须为 90/180/270。
 #[cfg(feature = "pdf")]
-pub fn rotate_pdf(input: &str, output: Option<&str>) -> ToolResult<String> {
+pub fn rotate_pdf(input: &str, degrees: u32, output: Option<&str>) -> ToolResult<String> {
     let data = std::fs::read(input)?;
-    let out_data = super::pdf_rotate(&data)?;
+    let out_data = super::pdf_rotate(&data, degrees)?;
     write_output(&out_data, input, output, "pdf")
 }
 
@@ -233,12 +318,184 @@ pub fn is_pdf_encrypted_file(path: &str) -> ToolResult<bool> {
     super::pdf_is_encrypted(&data)
 }
 
+/// 按自定义范围拆分 PDF 落盘:每段一个 PDF,返回产物路径列表
+#[cfg(feature = "pdf")]
+pub fn split_pdf_ranges(
+    input: &str,
+    ranges: &[(u32, u32)],
+    output_dir: Option<&str>,
+) -> ToolResult<Vec<String>> {
+    let data = std::fs::read(input)?;
+    let parts = super::pdf_split_ranges(&data, ranges)?;
+    write_split_parts(&parts, input, output_dir)
+}
+
+/// 每 N 页拆分 PDF 落盘:返回产物路径列表
+#[cfg(feature = "pdf")]
+pub fn split_pdf_every_n(input: &str, n: u32, output_dir: Option<&str>) -> ToolResult<Vec<String>> {
+    let data = std::fs::read(input)?;
+    let parts = super::pdf_split_every_n(&data, n)?;
+    write_split_parts(&parts, input, output_dir)
+}
+
+/// 按奇偶页拆分 PDF 落盘(单产物,落 `output_dir` 或源文件旁目录),返回产物路径列表
+#[cfg(feature = "pdf")]
+pub fn split_pdf_parity(
+    input: &str,
+    parity: super::Parity,
+    output_dir: Option<&str>,
+) -> ToolResult<Vec<String>> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_split_parity(&data, parity)?;
+    write_split_parts(&[out_data], input, output_dir)
+}
+
+/// 合并多个 PDF 落盘:默认输出第一个文件旁,返回产物路径
+#[cfg(feature = "pdf")]
+pub fn merge_pdfs(paths: &[String], output: Option<&str>) -> ToolResult<String> {
+    if paths.is_empty() {
+        return Err(ToolError::InvalidInput("无输入文件".into()));
+    }
+    let mut docs = Vec::with_capacity(paths.len());
+    for p in paths {
+        docs.push(std::fs::read(p)?);
+    }
+    let merged = super::pdf_merge(&docs)?;
+    write_output(&merged, &paths[0], output, "pdf")
+}
+
+/// 删除 PDF 指定页并落盘(默认源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn delete_pdf_pages(
+    input: &str,
+    page_nums: &[u32],
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_delete_pages(&data, page_nums)?;
+    write_output(&out_data, input, output, "pdf")
+}
+
+/// 提取 PDF 指定页并落盘(默认源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn extract_pdf_pages(
+    input: &str,
+    page_nums: &[u32],
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_extract_pages(&data, page_nums)?;
+    write_output(&out_data, input, output, "pdf")
+}
+
+/// 设置 PDF 元数据并落盘(默认源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn set_pdf_metadata(
+    input: &str,
+    title: Option<&str>,
+    author: Option<&str>,
+    subject: Option<&str>,
+    keywords: Option<&str>,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_set_metadata(&data, title, author, subject, keywords)?;
+    write_output(&out_data, input, output, "pdf")
+}
+
+/// 为 PDF 每页添加页码并落盘(默认源文件旁),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn add_pdf_page_numbers(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::pdf_add_page_numbers(&data)?;
+    write_output(&out_data, input, output, "pdf")
+}
+
+// ---- 字体 IO(font feature)----
+
+#[cfg(feature = "font")]
+use super::font::FontFormat;
+
+/// 字体格式互转并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "font")]
+pub fn convert_font_file(
+    input: &str,
+    target: FontFormat,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::font_convert(&data, target)?;
+    write_output(&out_data, input, output, target.ext())
+}
+
+/// 读取字体文件元数据(读盘 → 调纯 font_metadata → 格式化文本)
+#[cfg(feature = "font")]
+pub fn read_font_meta_file(input: &str) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let meta = super::font_metadata(&data)?;
+    Ok(super::font_meta_to_text(&meta))
+}
+
+// ---- SVG IO(svg feature)----
+
+#[cfg(feature = "svg")]
+use super::svg::SvgFormat;
+
+/// SVG 栅格化并落盘(默认输出到源文件旁),返回产物路径
+#[cfg(feature = "svg")]
+pub fn convert_svg_file(
+    input: &str,
+    target: SvgFormat,
+    output: Option<&str>,
+) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let out_data = super::svg_render(&data, target)?;
+    write_output(&out_data, input, output, target.ext())
+}
+
+// ---- XLSX IO(xlsx feature)----
+
+/// XLSX → JSON 文件(默认输出源文件旁 .json),返回产物路径
+#[cfg(feature = "xlsx")]
+pub fn xlsx_to_json_file(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let json = super::xlsx_to_json(&data)?;
+    write_output(json.as_bytes(), input, output, "json")
+}
+
+/// JSON → XLSX 文件(默认输出源文件旁 .xlsx),返回产物路径
+#[cfg(feature = "xlsx")]
+pub fn json_to_xlsx_file(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let xlsx = super::json_to_xlsx(&data)?;
+    write_output(&xlsx, input, output, "xlsx")
+}
+
+// ---- 文本提取 IO(pdf/archive feature)----
+
+/// PDF → TXT 文件(默认输出源文件旁 .txt),返回产物路径
+#[cfg(feature = "pdf")]
+pub fn pdf_to_text_file(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let text = super::pdf_to_text(&data)?;
+    write_output(text.as_bytes(), input, output, "txt")
+}
+
+/// DOCX → TXT 文件(默认输出源文件旁 .txt),返回产物路径
+#[cfg(feature = "archive")]
+pub fn docx_to_text_file(input: &str, output: Option<&str>) -> ToolResult<String> {
+    let data = std::fs::read(input)?;
+    let text = super::docx_to_text(&data)?;
+    write_output(text.as_bytes(), input, output, "txt")
+}
+
 // ---- 引擎 IO ----
 
 /// 引擎转换并落盘(默认输出到源文件旁),返回产物路径
 ///
 /// 引擎直接操作文件路径(非字节域):计算输出路径 → 检查可用性 → 委托执行。
-/// 显式 `output` 用之;否则源文件旁 `{stem}.{output_ext}`(引擎默认覆盖,与字节域碰撞策略不同)。
+/// 显式 `output` 用之;否则源文件旁 `{stem}.{output_ext}`,同扩展名时用
+/// `{stem}_converted.{output_ext}` 避免覆盖源文件。
 pub fn engine_convert_file(
     input: &str,
     engine: Engine,
@@ -248,10 +505,22 @@ pub fn engine_convert_file(
 ) -> ToolResult<String> {
     let out_path = match output {
         Some(o) => o.to_string(),
-        None => super::path::compute_output_path(input, output_ext, 0),
+        None => {
+            // 默认输出源文件旁;若同扩展名会覆盖源文件(如 pdf→pdf 压缩),用 _converted 后缀避开
+            let attempt = if same_ext(input, output_ext) { 1 } else { 0 };
+            super::path::compute_output_path(input, output_ext, attempt)
+        }
     };
     super::engine_convert(runner, engine, input, &out_path)?;
     Ok(out_path)
+}
+
+/// 输入路径末段扩展名是否与目标扩展名相同(忽略大小写)
+fn same_ext(input: &str, ext: &str) -> bool {
+    Path::new(input)
+        .extension()
+        .map(|e| e.eq_ignore_ascii_case(ext))
+        .unwrap_or(false)
 }
 
 // ---- 通用 IO helpers(无 feature gate)----

@@ -4,6 +4,38 @@
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-23
+
+### 新增
+
+- 引擎管理子系统:便携版自动安装(ffmpeg/pandoc 下载解压到 `%APPDATA%/NexToolkit/engines/`)+ CLI `engine check`/`engine install` + GUI 安装按钮。
+- 字符编码转换工具:UTF-8/GBK/GB2312/GB18030/Big5/Shift_JIS/EUC-JP/EUC-KR/ISO-8859-1/Windows-1252(encoding_rs,纯 Rust)。
+- 主题系统:明暗 + 跟随系统三态(TopBar Sun/Moon/Monitor 切换)。
+- 通用文件转换命令:`file-conv convert <input> <target>` 按源格式自动路由引擎(Office→LibreOffice/MD→pandoc/电子书→calibre/PDF→ghostscript)。
+- LibreOffice Windows 路径回退(`resolve_binary` 查 Program Files 默认安装路径)+ `CREATE_NO_WINDOW` 隐藏子进程 cmd 窗口。
+- Tesseract Windows 路径回退(`C:\Program Files\Tesseract-OCR\`)。
+- 前端架构重构:9 组按使用频率排序 + 子分类精简 46→30 + 哈希归 crypto + nettime 拆 network/time + BIDIRECTIONAL 扩展(chacha20/aes_gcm)。
+- GUI 图标设计:logo.svg(六边形+N 字)+ app icon PNG 序列 + icon.ico 重生成。
+- E2E 留痕目录:`tests/run.sh` 49 个测试 + 入库 fixture + report.md。
+- PDF 测试覆盖:split/rotate/encrypt/ranges/delete/extract/metadata/pagenum/merge。
+
+### 变更
+
+- 分组重命名:convert→"数据转换"、text→"文本处理"、crypto→"加密与哈希"(消除"转换/格式化"歧义)。
+- 删 5 个冗余 Tauri 命令(office_to_pdf/ebook_convert/markup_convert/pdf_compress/pdf_to_text),统一走 `convert_file` 通用入口。
+- 字号统一 token 体系:group 12px / sub+tool 13px。
+- 删 docs/audit/ + docs/design/(历史快照)。
+- GUI 组件:ToolTabs 删除(左侧树承担切换)+ EngineManager 面板化。
+
+### 修复
+
+- LibreOffice `-env:UserInstallation=...` 参数用 `=` 连接(之前拆两个参数导致退出码 1)。
+- Sidebar 收起后当前选中工具的 subgroup 保持展开。
+- toggle 按钮统一展开/收起(含 group + subgroup)。
+- `convert_pdf_to_text_with_content` 测试改 ASCII 内容(pdflatex 不支持 CJK)。
+
+## [0.3.0] — 2026-08-22
+
 ## [0.2.0] — 2026-08-21
 
 ### 新增

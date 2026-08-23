@@ -1,4 +1,4 @@
-//! 加密模块:AES-GCM/RSA/KDF
+//! 加密模块:AES-GCM/ChaCha20-Poly1305/RSA/Ed25519/KDF/Bcrypt/Scrypt/HMAC/CRC
 
 mod tools;
 pub use tools::*;
@@ -9,6 +9,19 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use rsa::{Oaep, RsaPrivateKey, RsaPublicKey};
 use sha2::Sha256;
+
+/// HMAC-SHA2 算法:SHA-2 家族 224/384/512 位变体
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::AsRefStr, strum::EnumString, strum::EnumIter,
+)]
+pub enum HmacAlgo {
+    #[strum(serialize = "sha224")]
+    Sha224,
+    #[strum(serialize = "sha384")]
+    Sha384,
+    #[strum(serialize = "sha512")]
+    Sha512,
+}
 
 // 私有辅助
 
@@ -204,6 +217,219 @@ pub fn kdf_argon2(password: &str, salt: &str) -> ToolResult<String> {
         .hash_password_into(password.as_bytes(), salt.as_bytes(), &mut out)
         .map_err(|e| ToolError::Other(e.to_string()))?;
     Ok(hex::encode(out))
+}
+
+// ChaCha20-Poly1305
+
+/// ChaCha20-Poly1305 加密:随机生成 16 字节 salt 与 12 字节 nonce,
+/// 以 PBKDF2-HMAC-SHA256(100_000 轮)从口令派生 32 字节密钥,加密明文,
+/// 输出 base64(salt || nonce || ciphertext||tag)。
+pub fn chacha20_encrypt(plaintext: &str, password: &str) -> ToolResult<String> {
+    use chacha20poly1305::aead::{Aead, KeyInit};
+    use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
+
+    let mut salt = [0u8; 16];
+    let mut nonce = [0u8; 12];
+    let mut rng = OsRng;
+    rng.fill_bytes(&mut salt);
+    rng.fill_bytes(&mut nonce);
+
+    let mut key = [0u8; 32];
+    pbkdf2_hmac_sha256(password.as_bytes(), &salt, 100_000, &mut key);
+
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(&key));
+    let ciphertext = cipher
+        .encrypt(Nonce::from_slice(&nonce), plaintext.as_bytes())
+        .map_err(|e| ToolError::Other(e.to_string()))?;
+
+    let mut blob = Vec::with_capacity(16 + 12 + ciphertext.len());
+    blob.extend_from_slice(&salt);
+    blob.extend_from_slice(&nonce);
+    blob.extend_from_slice(&ciphertext);
+    Ok(base64::engine::general_purpose::STANDARD.encode(&blob))
+}
+
+/// ChaCha20-Poly1305 解密:base64 解码后切出 salt/nonce/ciphertext,
+/// 派生密钥并认证解密;数据过短或认证失败返回 [`ToolError::InvalidInput`]。
+pub fn chacha20_decrypt(b64: &str, password: &str) -> ToolResult<String> {
+    use chacha20poly1305::aead::{Aead, KeyInit};
+    use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
+
+    let blob = base64::engine::general_purpose::STANDARD.decode(b64.trim())?;
+    if blob.len() < 16 + 12 {
+        return Err(ToolError::InvalidInput(
+            "解密失败:口令错误或数据损坏".into(),
+        ));
+    }
+    let (salt, rest) = blob.split_at(16);
+    let (nonce, ciphertext) = rest.split_at(12);
+
+    let mut key = [0u8; 32];
+    pbkdf2_hmac_sha256(password.as_bytes(), salt, 100_000, &mut key);
+
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(&key));
+    let plaintext = cipher
+        .decrypt(Nonce::from_slice(nonce), ciphertext)
+        .map_err(|_| ToolError::InvalidInput("解密失败:口令错误或数据损坏".into()))?;
+    String::from_utf8(plaintext).map_err(ToolError::from)
+}
+
+// Ed25519
+
+/// 生成 Ed25519 密钥对,输出 PKCS#8 PEM:私钥块(`-----BEGIN PRIVATE KEY-----`)
+/// + 空行 + 公钥块(`-----BEGIN PUBLIC KEY-----`)。
+pub fn ed25519_keygen() -> ToolResult<String> {
+    use ed25519_dalek::pkcs8::{EncodePrivateKey, EncodePublicKey};
+    use ed25519_dalek::SigningKey;
+    use pkcs8::LineEnding;
+
+    // 生成 32 字节随机密钥种子,经 from_bytes 构造 SigningKey
+    let mut secret = [0u8; 32];
+    let mut rng = OsRng;
+    rng.fill_bytes(&mut secret);
+    let signing_key = SigningKey::from_bytes(&secret);
+    let priv_pem = signing_key
+        .to_pkcs8_pem(LineEnding::LF)
+        .map_err(|e| ToolError::Other(e.to_string()))?;
+    let pub_pem = signing_key
+        .verifying_key()
+        .to_public_key_pem(LineEnding::LF)
+        .map_err(|e| ToolError::Other(e.to_string()))?;
+
+    Ok(format!(
+        "{}\n\n{}\n",
+        priv_pem.trim_end(),
+        pub_pem.trim_end()
+    ))
+}
+
+/// 解析 Ed25519 PKCS#8 私钥 PEM(`-----BEGIN PRIVATE KEY-----`)
+pub(crate) fn parse_ed25519_private_key(pem: &str) -> ToolResult<ed25519_dalek::SigningKey> {
+    use ed25519_dalek::pkcs8::DecodePrivateKey;
+    ed25519_dalek::SigningKey::from_pkcs8_pem(pem)
+        .map_err(|e| ToolError::InvalidInput(format!("无效的 Ed25519 私钥 PEM:{e}")))
+}
+
+/// 解析 Ed25519 SPKI 公钥 PEM(`-----BEGIN PUBLIC KEY-----`)
+pub(crate) fn parse_ed25519_public_key(pem: &str) -> ToolResult<ed25519_dalek::VerifyingKey> {
+    use ed25519_dalek::pkcs8::DecodePublicKey;
+    ed25519_dalek::VerifyingKey::from_public_key_pem(pem)
+        .map_err(|e| ToolError::InvalidInput(format!("无效的 Ed25519 公钥 PEM:{e}")))
+}
+
+/// Ed25519 签名:私钥对输入签名,返回 base64 签名(64 字节)
+pub fn ed25519_sign(input: &str, priv_pem: &str) -> ToolResult<String> {
+    use ed25519_dalek::Signer;
+
+    let signing_key = parse_ed25519_private_key(priv_pem)?;
+    let signature = signing_key.sign(input.as_bytes());
+    Ok(base64::engine::general_purpose::STANDARD.encode(signature.to_bytes()))
+}
+
+/// Ed25519 验签:公钥验证 input 与 base64 签名是否匹配
+///
+/// 验证成功返回 Ok(()),签名错误或公钥不匹配返回 Err。
+pub fn ed25519_verify(input: &str, pub_pem: &str, signature_b64: &str) -> ToolResult<()> {
+    use ed25519_dalek::Verifier;
+
+    let verifying_key = parse_ed25519_public_key(pub_pem)?;
+    let sig_bytes = base64::engine::general_purpose::STANDARD.decode(signature_b64.trim())?;
+    let signature = ed25519_dalek::Signature::try_from(sig_bytes.as_slice())
+        .map_err(|e| ToolError::InvalidInput(format!("无效签名: {e}")))?;
+    verifying_key
+        .verify(input.as_bytes(), &signature)
+        .map_err(|_| ToolError::InvalidInput("签名验证失败".into()))
+}
+
+// Bcrypt
+
+/// Bcrypt 哈希:返回自包含的 bcrypt 哈希字符串(内嵌 salt 与 cost);cost 建议 4~31
+pub fn bcrypt_hash(password: &str, cost: u32) -> ToolResult<String> {
+    bcrypt::hash(password, cost).map_err(|e| ToolError::Other(e.to_string()))
+}
+
+/// Bcrypt 验证:密码与哈希匹配返回 Ok(()),不匹配或哈希损坏返回 Err
+pub fn bcrypt_verify(password: &str, hash: &str) -> ToolResult<()> {
+    match bcrypt::verify(password, hash) {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(ToolError::InvalidInput("密码不匹配".into())),
+        Err(e) => Err(ToolError::Other(e.to_string())),
+    }
+}
+
+// Scrypt
+
+/// Scrypt 派生 32 字节密钥,返回十六进制字符串(小写);salt 至少 8 字节,过短返回 Err。
+/// 使用推荐参数(log₂(n)=15, r=8, p=1)。
+pub fn scrypt_hash(password: &str, salt: &str) -> ToolResult<String> {
+    use scrypt::{scrypt as scrypt_kdf, Params};
+
+    if salt.len() < 8 {
+        return Err(ToolError::InvalidInput(format!(
+            "salt 过短:至少 8 字节,实际 {} 字节",
+            salt.len()
+        )));
+    }
+
+    let params = Params::recommended();
+    let mut out = [0u8; 32];
+    scrypt_kdf(password.as_bytes(), salt.as_bytes(), &params, &mut out)
+        .map_err(|e| ToolError::Other(e.to_string()))?;
+    Ok(hex::encode(out))
+}
+
+/// Scrypt 验证:用相同 salt 重新派生并与 `expected_hex` 比对,匹配返回 Ok(())
+pub fn scrypt_verify(password: &str, salt: &str, expected_hex: &str) -> ToolResult<()> {
+    let derived = scrypt_hash(password, salt)?;
+    if derived == expected_hex.trim().to_lowercase() {
+        Ok(())
+    } else {
+        Err(ToolError::InvalidInput("密码不匹配".into()))
+    }
+}
+
+// HMAC 扩展(SHA-2 家族 224/384/512)
+
+/// HMAC-SHA2 消息认证码:支持 Sha224/Sha384/Sha512,返回十六进制字符串
+pub fn hmac_multi(data: &str, key: &str, algo: HmacAlgo) -> ToolResult<String> {
+    use hmac::{Hmac, Mac};
+    use sha2::{Sha224, Sha384, Sha512};
+    match algo {
+        HmacAlgo::Sha224 => {
+            let mut mac = Hmac::<Sha224>::new_from_slice(key.as_bytes())
+                .map_err(|e| ToolError::Other(e.to_string()))?;
+            mac.update(data.as_bytes());
+            Ok(format!("{:x}", mac.finalize().into_bytes()))
+        }
+        HmacAlgo::Sha384 => {
+            let mut mac = Hmac::<Sha384>::new_from_slice(key.as_bytes())
+                .map_err(|e| ToolError::Other(e.to_string()))?;
+            mac.update(data.as_bytes());
+            Ok(format!("{:x}", mac.finalize().into_bytes()))
+        }
+        HmacAlgo::Sha512 => {
+            let mut mac = Hmac::<Sha512>::new_from_slice(key.as_bytes())
+                .map_err(|e| ToolError::Other(e.to_string()))?;
+            mac.update(data.as_bytes());
+            Ok(format!("{:x}", mac.finalize().into_bytes()))
+        }
+    }
+}
+
+// CRC
+
+/// CRC-32(ISO-HDLC,与 zlib/gzip 同算法),返回 8 位十六进制字符串
+pub fn crc32(input: &str) -> ToolResult<String> {
+    use crc::{Crc, CRC_32_ISO_HDLC};
+    let crc = Crc::<u32>::new(&CRC_32_ISO_HDLC);
+    Ok(format!("{:08x}", crc.checksum(input.as_bytes())))
+}
+
+/// CRC-64(XZ 多项式),返回 16 位十六进制字符串
+pub fn crc64(input: &str) -> ToolResult<String> {
+    use crc::{Crc, CRC_64_XZ};
+    let crc = Crc::<u64>::new(&CRC_64_XZ);
+    Ok(format!("{:016x}", crc.checksum(input.as_bytes())))
 }
 
 #[cfg(test)]
@@ -431,5 +657,273 @@ mod tests {
         let s = keygen.find(begin).expect("含公钥块");
         let e = keygen.find(end).expect("含公钥结束标记") + end.len();
         keygen[s..e].to_string()
+    }
+
+    // ---- 测试辅助:从 Ed25519 keygen 输出中拆出 PEM 块 ----
+
+    fn ed_priv_pem_block(keygen: &str) -> String {
+        let begin = "-----BEGIN PRIVATE KEY-----";
+        let end = "-----END PRIVATE KEY-----";
+        let s = keygen.find(begin).expect("含 Ed25519 私钥块");
+        let e = keygen.find(end).expect("含 Ed25519 私钥结束标记") + end.len();
+        keygen[s..e].to_string()
+    }
+
+    fn ed_pub_pem_block(keygen: &str) -> String {
+        let begin = "-----BEGIN PUBLIC KEY-----";
+        let end = "-----END PUBLIC KEY-----";
+        let s = keygen.find(begin).expect("含 Ed25519 公钥块");
+        let e = keygen.find(end).expect("含 Ed25519 公钥结束标记") + end.len();
+        keygen[s..e].to_string()
+    }
+
+    // ---- ChaCha20-Poly1305 ----
+
+    #[test]
+    fn chacha20_roundtrip() {
+        for s in [
+            "",
+            "a",
+            "Hello, NexToolkit!",
+            "中文测试🎉",
+            "多行\n文本\t含特殊字符",
+        ] {
+            let enc = chacha20_encrypt(s, "p@ssw0rd").unwrap();
+            let dec = chacha20_decrypt(&enc, "p@ssw0rd").unwrap();
+            assert_eq!(dec, s, "roundtrip 失败:明文 {s:?}");
+        }
+    }
+
+    #[test]
+    fn chacha20_wrong_password_fails() {
+        let enc = chacha20_encrypt("secret", "right-password").unwrap();
+        assert!(chacha20_decrypt(&enc, "wrong-password").is_err());
+    }
+
+    #[test]
+    fn chacha20_nondeterministic() {
+        let a = chacha20_encrypt("same", "pw").unwrap();
+        let b = chacha20_encrypt("same", "pw").unwrap();
+        assert_ne!(a, b);
+        assert_eq!(chacha20_decrypt(&a, "pw").unwrap(), "same");
+        assert_eq!(chacha20_decrypt(&b, "pw").unwrap(), "same");
+    }
+
+    #[test]
+    fn chacha20_corrupted_fails() {
+        assert!(chacha20_decrypt("AAAA", "pw").is_err());
+        assert!(chacha20_decrypt("!!!!不是合法base64!!!!", "pw").is_err());
+    }
+
+    // ---- Ed25519 密钥生成 ----
+
+    #[test]
+    fn ed25519_keygen_has_pem_markers() {
+        let pem = ed25519_keygen().unwrap();
+        assert!(pem.contains("-----BEGIN PRIVATE KEY-----"));
+        assert!(pem.contains("-----END PRIVATE KEY-----"));
+        assert!(pem.contains("-----BEGIN PUBLIC KEY-----"));
+        assert!(pem.contains("-----END PUBLIC KEY-----"));
+        assert!(pem.contains("-----END PRIVATE KEY-----\n\n-----BEGIN PUBLIC KEY-----"));
+    }
+
+    #[test]
+    fn ed25519_keygen_parseable() {
+        let pem = ed25519_keygen().unwrap();
+        assert!(parse_ed25519_private_key(&ed_priv_pem_block(&pem)).is_ok());
+        assert!(parse_ed25519_public_key(&ed_pub_pem_block(&pem)).is_ok());
+    }
+
+    // ---- Ed25519 签名/验签 ----
+
+    #[test]
+    fn ed25519_sign_verify_roundtrip() {
+        let pem = ed25519_keygen().unwrap();
+        let priv_pem = ed_priv_pem_block(&pem);
+        let pub_pem = ed_pub_pem_block(&pem);
+        for msg in ["hello", "NexToolkit 签名测试", "x"] {
+            let sig = ed25519_sign(msg, &priv_pem).unwrap();
+            assert!(
+                ed25519_verify(msg, &pub_pem, &sig).is_ok(),
+                "正确签名应验证通过"
+            );
+        }
+    }
+
+    #[test]
+    fn ed25519_verify_wrong_message_fails() {
+        let pem = ed25519_keygen().unwrap();
+        let priv_pem = ed_priv_pem_block(&pem);
+        let pub_pem = ed_pub_pem_block(&pem);
+        let sig = ed25519_sign("original", &priv_pem).unwrap();
+        assert!(
+            ed25519_verify("tampered", &pub_pem, &sig).is_err(),
+            "篡改消息应验签失败"
+        );
+    }
+
+    #[test]
+    fn ed25519_verify_wrong_key_fails() {
+        let k1 = ed25519_keygen().unwrap();
+        let k2 = ed25519_keygen().unwrap();
+        let sig = ed25519_sign("data", &ed_priv_pem_block(&k1)).unwrap();
+        assert!(ed25519_verify("data", &ed_pub_pem_block(&k2), &sig).is_err());
+    }
+
+    #[test]
+    fn ed25519_invalid_pem_rejected() {
+        assert!(ed25519_sign("x", "not a pem").is_err());
+        assert!(ed25519_verify("x", "not a pem", "sig").is_err());
+    }
+
+    #[test]
+    fn ed25519_invalid_signature_rejected() {
+        let pem = ed25519_keygen().unwrap();
+        let pub_pem = ed_pub_pem_block(&pem);
+        assert!(ed25519_verify("x", &pub_pem, "!!!!").is_err());
+        assert!(ed25519_verify("x", &pub_pem, "AAAA").is_err());
+    }
+
+    // ---- Bcrypt ----
+
+    #[test]
+    fn bcrypt_hash_verify_roundtrip() {
+        let hash = bcrypt_hash("my-password", 4).unwrap();
+        assert!(bcrypt_verify("my-password", &hash).is_ok());
+    }
+
+    #[test]
+    fn bcrypt_wrong_password_fails() {
+        let hash = bcrypt_hash("correct", 4).unwrap();
+        assert!(bcrypt_verify("wrong", &hash).is_err());
+    }
+
+    #[test]
+    fn bcrypt_hash_has_format() {
+        let hash = bcrypt_hash("pw", 4).unwrap();
+        assert!(hash.starts_with("$2"));
+        assert!(hash.contains('$'));
+    }
+
+    #[test]
+    fn bcrypt_invalid_hash_fails() {
+        assert!(bcrypt_verify("pw", "not-a-bcrypt-hash").is_err());
+    }
+
+    // ---- Scrypt ----
+
+    #[test]
+    fn scrypt_deterministic() {
+        let a = scrypt_hash("password", "saltsalt").unwrap();
+        let b = scrypt_hash("password", "saltsalt").unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 64);
+        assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn scrypt_different_inputs_differ() {
+        let a = scrypt_hash("password", "saltsalt").unwrap();
+        assert_ne!(a, scrypt_hash("password", "saltsalt2").unwrap());
+        assert_ne!(a, scrypt_hash("password2", "saltsalt").unwrap());
+    }
+
+    #[test]
+    fn scrypt_short_salt_rejected() {
+        assert!(scrypt_hash("password", "short").is_err());
+        assert!(scrypt_hash("password", "").is_err());
+        assert!(scrypt_hash("password", "12345678").is_ok());
+    }
+
+    #[test]
+    fn scrypt_verify_roundtrip() {
+        let hash = scrypt_hash("secret", "saltsalt").unwrap();
+        assert!(scrypt_verify("secret", "saltsalt", &hash).is_ok());
+    }
+
+    #[test]
+    fn scrypt_verify_wrong_password_fails() {
+        let hash = scrypt_hash("correct", "saltsalt").unwrap();
+        assert!(scrypt_verify("wrong", "saltsalt", &hash).is_err());
+    }
+
+    // ---- HMAC-SHA2 扩展 ----
+
+    #[test]
+    fn hmac_sha512_matches_generate_impl() {
+        // 与 generate 模块已测试的 hmac_compute(Sha512)交叉比对:同一底层 crate 必产出一致结果
+        let ext = hmac_multi("data", "key", HmacAlgo::Sha512).unwrap();
+        let gen = crate::generate::hmac_compute("data", "key", crate::generate::HashAlgo::Sha512)
+            .unwrap();
+        assert_eq!(ext, gen);
+    }
+
+    #[test]
+    fn hmac_sha224_format() {
+        let result = hmac_multi("data", "key", HmacAlgo::Sha224).unwrap();
+        assert_eq!(result.len(), 56); // 28 字节 = 56 hex
+        assert!(result.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn hmac_sha384_format() {
+        let result = hmac_multi("data", "key", HmacAlgo::Sha384).unwrap();
+        assert_eq!(result.len(), 96); // 48 字节 = 96 hex
+        assert!(result.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn hmac_multi_deterministic() {
+        let a = hmac_multi("data", "key", HmacAlgo::Sha512).unwrap();
+        let b = hmac_multi("data", "key", HmacAlgo::Sha512).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn hmac_multi_different_algos_differ() {
+        let a = hmac_multi("data", "key", HmacAlgo::Sha224).unwrap();
+        let b = hmac_multi("data", "key", HmacAlgo::Sha384).unwrap();
+        let c = hmac_multi("data", "key", HmacAlgo::Sha512).unwrap();
+        assert_ne!(a, b);
+        assert_ne!(b, c);
+        assert_ne!(a, c);
+    }
+
+    // ---- CRC ----
+
+    #[test]
+    fn crc32_known_value() {
+        // CRC-32/ISO-HDLC("123456789") = 0xCBF43926(zlib 标准校验值)
+        assert_eq!(crc32("123456789").unwrap(), "cbf43926");
+    }
+
+    #[test]
+    fn crc32_empty() {
+        assert_eq!(crc32("").unwrap(), "00000000");
+    }
+
+    #[test]
+    fn crc32_unicode() {
+        let out = crc32("中文").unwrap();
+        assert_eq!(out.len(), 8);
+        assert!(out.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn crc64_known_value() {
+        // CRC-64/XZ("123456789") = 0x995DC9BBDF1939FA(CRC catalogue 官方 check value)
+        assert_eq!(crc64("123456789").unwrap(), "995dc9bbdf1939fa");
+    }
+
+    #[test]
+    fn crc64_empty() {
+        assert_eq!(crc64("").unwrap(), "0000000000000000");
+    }
+
+    #[test]
+    fn crc64_format() {
+        let out = crc64("hello").unwrap();
+        assert_eq!(out.len(), 16);
+        assert!(out.chars().all(|c| c.is_ascii_hexdigit()));
     }
 }

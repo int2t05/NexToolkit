@@ -1,4 +1,4 @@
-//! CLI 输入输出辅助:stdin 读取、print 折样样板
+//! CLI 输入输出辅助:stdin 读取、print 样板
 
 use std::io::Read;
 

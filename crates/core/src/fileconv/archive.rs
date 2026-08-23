@@ -1,7 +1,8 @@
-//! 归档模块:ZIP/TAR/TAR.GZ/GZ 解压与压缩(字节域,纯内存)
+//! 归档模块:ZIP/TAR/TAR.GZ/GZ/BZ2/XZ/ZST 解压与压缩(字节域,纯内存)
 //!
 //! 输入输出为 `&[u8]`/`Vec<u8>`,不碰文件系统。格式经魔术字节检测自动路由。
 //! 路径安全:拒绝 `..` 遍历与绝对路径,避免 zip-slip 类攻击。
+//! BZ2/XZ/ZST 同 GZ 为单文件压缩格式,`entries` 长度必须为 1。
 
 use crate::{ToolError, ToolResult};
 use std::io::{Read, Write};
@@ -20,6 +21,12 @@ pub enum ArchiveFormat {
     Gz,
     #[strum(serialize = "7z")]
     SevenZ,
+    #[strum(serialize = "bz2")]
+    Bz2,
+    #[strum(serialize = "xz")]
+    Xz,
+    #[strum(serialize = "zst")]
+    Zst,
 }
 
 /// 归档条目:归档内相对路径 + 文件内容(纯 gz 单文件时 path 为空串)
@@ -32,13 +39,24 @@ pub struct ArchiveEntry {
 /// 检测归档格式(魔术字节路由)
 ///
 /// ZIP: `50 4B 03 04`;GZ: `1F 8B`(tar.gz 与纯 gz 统一标 Gz,解压时再分);
-/// 7Z: `37 7A BC AF 27 1C`;TAR: `ustar` @ offset 257。无法识别返回 `InvalidInput`。
+/// 7Z: `37 7A BC AF 27 1C`;TAR: `ustar` @ offset 257;
+/// BZ2: `42 5A 68`("BZh");XZ: `FD 37 7A 58 5A 00`;ZST: `28 B5 2F FD`。
+/// 无法识别返回 `InvalidInput`。
 pub fn detect_archive_format(data: &[u8]) -> ToolResult<ArchiveFormat> {
     if data.len() >= 4 && data[0..4] == [0x50, 0x4B, 0x03, 0x04] {
         return Ok(ArchiveFormat::Zip);
     }
     if data.len() >= 6 && data[0..6] == [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C] {
         return Ok(ArchiveFormat::SevenZ);
+    }
+    if data.len() >= 6 && data[0..6] == [0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00] {
+        return Ok(ArchiveFormat::Xz);
+    }
+    if data.len() >= 4 && data[0..4] == [0x28, 0xB5, 0x2F, 0xFD] {
+        return Ok(ArchiveFormat::Zst);
+    }
+    if data.len() >= 3 && data[0..3] == [0x42, 0x5A, 0x68] {
+        return Ok(ArchiveFormat::Bz2);
     }
     if data.len() >= 2 && data[0] == 0x1F && data[1] == 0x8B {
         return Ok(ArchiveFormat::Gz);
@@ -101,20 +119,17 @@ pub fn archive_extract_as(data: &[u8], format: ArchiveFormat) -> ToolResult<Vec<
             let decompressed = gz_decompress(data)?;
             tar_extract(&decompressed)
         }
-        ArchiveFormat::Gz => {
-            let decompressed = gz_decompress(data)?;
-            Ok(vec![ArchiveEntry {
-                path: String::new(),
-                data: decompressed,
-            }])
-        }
+        ArchiveFormat::Gz => single_entry(gz_decompress(data)?),
         ArchiveFormat::SevenZ => sevenz_extract(data),
+        ArchiveFormat::Bz2 => single_entry(bz2_decompress(data)?),
+        ArchiveFormat::Xz => single_entry(xz_decompress(data)?),
+        ArchiveFormat::Zst => single_entry(zst_decompress(data)?),
     }
 }
 
 /// 创建归档:将条目列表打包为指定格式
 ///
-/// GZ 为单文件格式,`entries` 长度必须为 1;条目路径先经安全校验。
+/// GZ/BZ2/XZ/ZST 为单文件压缩格式,`entries` 长度必须为 1;条目路径先经安全校验。
 pub fn archive_create(entries: &[ArchiveEntry], format: ArchiveFormat) -> ToolResult<Vec<u8>> {
     for e in entries {
         if !e.path.is_empty() {
@@ -128,16 +143,33 @@ pub fn archive_create(entries: &[ArchiveEntry], format: ArchiveFormat) -> ToolRe
             let tar = tar_create(entries)?;
             gz_compress(&tar)
         }
-        ArchiveFormat::Gz => {
-            if entries.len() != 1 {
-                return Err(ToolError::InvalidInput(
-                    "GZ 为单文件压缩格式,仅支持一个条目".into(),
-                ));
-            }
-            gz_compress(&entries[0].data)
-        }
+        ArchiveFormat::Gz => single_file(entries, gz_compress),
         ArchiveFormat::SevenZ => Err(ToolError::InvalidInput("7z 创建暂不支持(仅解压)".into())),
+        ArchiveFormat::Bz2 => single_file(entries, bz2_compress),
+        ArchiveFormat::Xz => single_file(entries, xz_compress),
+        ArchiveFormat::Zst => single_file(entries, zst_compress),
     }
+}
+
+/// 单文件压缩格式(GZ/BZ2/XZ/ZST)统一处理:校验仅一个条目,取其数据压缩
+fn single_file(
+    entries: &[ArchiveEntry],
+    compress: impl Fn(&[u8]) -> ToolResult<Vec<u8>>,
+) -> ToolResult<Vec<u8>> {
+    if entries.len() != 1 {
+        return Err(ToolError::InvalidInput(
+            "该格式为单文件压缩格式,仅支持一个条目".into(),
+        ));
+    }
+    compress(&entries[0].data)
+}
+
+/// 单文件解压结果包装为单条目(path 为空串,与 GZ 模式一致)
+fn single_entry(data: Vec<u8>) -> ToolResult<Vec<ArchiveEntry>> {
+    Ok(vec![ArchiveEntry {
+        path: String::new(),
+        data,
+    }])
 }
 
 /// 归档格式互转:解压(自动检测)→ 重新打包为目标格式
@@ -156,6 +188,9 @@ fn extract_auto(data: &[u8]) -> ToolResult<(ArchiveFormat, Vec<ArchiveEntry>)> {
         ArchiveFormat::Zip => Ok((ArchiveFormat::Zip, zip_extract(data)?)),
         ArchiveFormat::Tar => Ok((ArchiveFormat::Tar, tar_extract(data)?)),
         ArchiveFormat::SevenZ => Ok((ArchiveFormat::SevenZ, sevenz_extract(data)?)),
+        ArchiveFormat::Bz2 => Ok((ArchiveFormat::Bz2, single_entry(bz2_decompress(data)?)?)),
+        ArchiveFormat::Xz => Ok((ArchiveFormat::Xz, single_entry(xz_decompress(data)?)?)),
+        ArchiveFormat::Zst => Ok((ArchiveFormat::Zst, single_entry(zst_decompress(data)?)?)),
         ArchiveFormat::Gz => {
             let decompressed = gz_decompress(data)?;
             match tar_extract(&decompressed) {
@@ -186,6 +221,44 @@ fn gz_decompress(data: &[u8]) -> ToolResult<Vec<u8>> {
     let mut buf = Vec::new();
     decoder.read_to_end(&mut buf)?;
     Ok(buf)
+}
+
+fn bz2_compress(data: &[u8]) -> ToolResult<Vec<u8>> {
+    use bzip2::{write::BzEncoder, Compression};
+    let mut encoder = BzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(data)?;
+    Ok(encoder.finish()?)
+}
+
+fn bz2_decompress(data: &[u8]) -> ToolResult<Vec<u8>> {
+    use bzip2::read::BzDecoder;
+    let mut decoder = BzDecoder::new(data);
+    let mut buf = Vec::new();
+    decoder.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+fn xz_compress(data: &[u8]) -> ToolResult<Vec<u8>> {
+    use xz2::write::XzEncoder;
+    let mut encoder = XzEncoder::new(Vec::new(), 6);
+    encoder.write_all(data)?;
+    Ok(encoder.finish()?)
+}
+
+fn xz_decompress(data: &[u8]) -> ToolResult<Vec<u8>> {
+    use xz2::read::XzDecoder;
+    let mut decoder = XzDecoder::new(data);
+    let mut buf = Vec::new();
+    decoder.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+fn zst_compress(data: &[u8]) -> ToolResult<Vec<u8>> {
+    Ok(zstd::encode_all(data, 3)?)
+}
+
+fn zst_decompress(data: &[u8]) -> ToolResult<Vec<u8>> {
+    Ok(zstd::decode_all(data)?)
 }
 
 fn tar_extract(data: &[u8]) -> ToolResult<Vec<ArchiveEntry>> {
@@ -292,10 +365,10 @@ fn zip_create(entries: &[ArchiveEntry]) -> ToolResult<Vec<u8>> {
     Ok(cursor.into_inner())
 }
 
-/// 校验条目路径:拒绝绝对路径(Unix `/`、Windows 盘符)与 `..` 遍历
+/// 校验条目路径:拒绝绝对路径(`/`、`\`)与 Windows 盘符(`C:`)与 `..` 遍历
 fn validate_entry_path(path: &str) -> ToolResult<()> {
     let bytes = path.as_bytes();
-    // Unix 绝对路径(`/`、`\`)或 Windows 盘符(`C:`)
+    // 绝对路径(`/` 或 `\`)或 Windows 盘符(`C:`)
     let is_absolute = path.starts_with('/')
         || path.starts_with('\\')
         || (bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':');
@@ -570,6 +643,149 @@ mod tests {
         .unwrap();
         let list = archive_list(&gz).unwrap();
         assert!(list.contains("(解压内容)\t8"));
+    }
+
+    // ---- bz2 ----
+
+    #[test]
+    fn bz2_roundtrip() {
+        for data in [b"".as_ref(), b"a", b"hello world", b"\x00\x01\x02\xff"] {
+            let compressed = bz2_compress(data).unwrap();
+            assert_eq!(bz2_decompress(&compressed).unwrap(), data);
+        }
+    }
+
+    #[test]
+    fn detect_bz2_magic() {
+        let bz2 = archive_create(
+            std::slice::from_ref(&ArchiveEntry {
+                path: "x".into(),
+                data: b"data".to_vec(),
+            }),
+            ArchiveFormat::Bz2,
+        )
+        .unwrap();
+        assert_eq!(detect_archive_format(&bz2).unwrap(), ArchiveFormat::Bz2);
+    }
+
+    #[test]
+    fn bz2_single_roundtrip() {
+        let entry = ArchiveEntry {
+            path: "data.bin".into(),
+            data: b"contents".to_vec(),
+        };
+        let bz2 = archive_create(std::slice::from_ref(&entry), ArchiveFormat::Bz2).unwrap();
+        let extracted = archive_extract_as(&bz2, ArchiveFormat::Bz2).unwrap();
+        assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].data, b"contents");
+        assert!(extracted[0].path.is_empty());
+    }
+
+    #[test]
+    fn bz2_multi_entry_rejected() {
+        assert!(archive_create(&sample_entries(), ArchiveFormat::Bz2).is_err());
+    }
+
+    #[test]
+    fn bz2_extract_auto() {
+        let bz2 = archive_create(
+            std::slice::from_ref(&ArchiveEntry {
+                path: "x".into(),
+                data: b"auto detect me".to_vec(),
+            }),
+            ArchiveFormat::Bz2,
+        )
+        .unwrap();
+        let extracted = archive_extract(&bz2).unwrap();
+        assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].data, b"auto detect me");
+    }
+
+    // ---- xz ----
+
+    #[test]
+    fn xz_roundtrip() {
+        for data in [b"".as_ref(), b"a", b"hello world", b"\x00\x01\x02\xff"] {
+            let compressed = xz_compress(data).unwrap();
+            assert_eq!(xz_decompress(&compressed).unwrap(), data);
+        }
+    }
+
+    #[test]
+    fn detect_xz_magic() {
+        let xz = archive_create(
+            std::slice::from_ref(&ArchiveEntry {
+                path: "x".into(),
+                data: b"data".to_vec(),
+            }),
+            ArchiveFormat::Xz,
+        )
+        .unwrap();
+        assert_eq!(detect_archive_format(&xz).unwrap(), ArchiveFormat::Xz);
+    }
+
+    #[test]
+    fn xz_single_roundtrip() {
+        let entry = ArchiveEntry {
+            path: "data.bin".into(),
+            data: b"xz contents".to_vec(),
+        };
+        let xz = archive_create(std::slice::from_ref(&entry), ArchiveFormat::Xz).unwrap();
+        let extracted = archive_extract_as(&xz, ArchiveFormat::Xz).unwrap();
+        assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].data, b"xz contents");
+    }
+
+    // ---- zst ----
+
+    #[test]
+    fn zst_roundtrip() {
+        for data in [b"".as_ref(), b"a", b"hello world", b"\x00\x01\x02\xff"] {
+            let compressed = zst_compress(data).unwrap();
+            assert_eq!(zst_decompress(&compressed).unwrap(), data);
+        }
+    }
+
+    #[test]
+    fn detect_zst_magic() {
+        let zst = archive_create(
+            std::slice::from_ref(&ArchiveEntry {
+                path: "x".into(),
+                data: b"data".to_vec(),
+            }),
+            ArchiveFormat::Zst,
+        )
+        .unwrap();
+        assert_eq!(detect_archive_format(&zst).unwrap(), ArchiveFormat::Zst);
+    }
+
+    #[test]
+    fn zst_single_roundtrip() {
+        let entry = ArchiveEntry {
+            path: "data.bin".into(),
+            data: b"zst contents".to_vec(),
+        };
+        let zst = archive_create(std::slice::from_ref(&entry), ArchiveFormat::Zst).unwrap();
+        let extracted = archive_extract_as(&zst, ArchiveFormat::Zst).unwrap();
+        assert_eq!(extracted.len(), 1);
+        assert_eq!(extracted[0].data, b"zst contents");
+    }
+
+    // ---- 单文件格式互转 ----
+
+    #[test]
+    fn convert_gz_to_xz() {
+        let gz = archive_create(
+            std::slice::from_ref(&ArchiveEntry {
+                path: "x".into(),
+                data: b"convert me".to_vec(),
+            }),
+            ArchiveFormat::Gz,
+        )
+        .unwrap();
+        let xz = archive_convert(&gz, ArchiveFormat::Xz).unwrap();
+        let extracted = archive_extract_as(&xz, ArchiveFormat::Xz).unwrap();
+        assert_eq!(extracted[0].data, b"convert me");
     }
 
     // ---- tar ----

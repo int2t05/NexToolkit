@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- 六边形外框:工具集容器 -->
+  <path d="M32 4 L56 18 L56 46 L32 60 L8 46 L8 18 Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" opacity="0.9"/>
+  <!-- N 字:Nextool,加粗几何感 -->
+  <path d="M22 44 L22 20 L26 20 L38 36 L38 20 L42 20 L42 44 L38 44 L26 28 L26 44 Z" fill="currentColor"/>
+  <!-- 齿轮暗示:右下小圆点 -->
+  <circle cx="44" cy="44" r="2.5" fill="currentColor" opacity="0.6"/>
+</svg>

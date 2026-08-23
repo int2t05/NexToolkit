@@ -1,4 +1,4 @@
-//! 文件转换子命令:归档解压/压缩/转换/列表 + 图像转换/缩放
+//! 文件转换子命令:归档/图像/PDF/字体/SVG/引擎/电子表格
 //!
 //! 薄封装 [`nextool_core::fileconv`] 的纯内存 API 与 [`nextool_core::fileconv::fs_util`] 的落盘边界。
 //! 产物落源文件所在目录(碰撞处理见 fs_util)。
@@ -30,19 +30,78 @@ enum FileConvCmd {
         #[command(subcommand)]
         cmd: PdfCmd,
     },
+    /// 字体操作:TTF↔WOFF 转换/元数据查看
+    Font {
+        #[command(subcommand)]
+        cmd: FontCmd,
+    },
+    /// SVG 栅格化:SVG→PNG/JPG
+    Svg {
+        #[command(subcommand)]
+        cmd: SvgCmd,
+    },
+    /// 引擎转换:音视频/OCR(运行时探测系统已装引擎)
+    Engine {
+        #[command(subcommand)]
+        cmd: EngineCmd,
+    },
+    /// 电子表格:XLSX↔JSON 互转
+    Xlsx {
+        #[command(subcommand)]
+        cmd: XlsxCmd,
+    },
+    /// 文本提取:DOCX → TXT
+    Extract {
+        #[command(subcommand)]
+        cmd: ExtractCmd,
+    },
+    /// 通用文件转换:按源格式自动路由(Office→任意/MD→任意/电子书→任意/PDF→任意)
+    Convert { input: String, target: String },
+}
+
+#[derive(Subcommand)]
+enum FontCmd {
+    /// 字体格式互转(ttf↔woff)
+    Convert {
+        input: String,
+        target: nextool_core::FontFormat,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 查看字体元数据(名称/版权/字重/UPM)
+    Meta { input: String },
+}
+
+#[derive(Subcommand)]
+enum SvgCmd {
+    /// SVG 栅格化为位图(--target png/jpg)
+    Convert {
+        input: String,
+        target: nextool_core::SvgFormat,
+        #[arg(long)]
+        output: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
 enum PdfCmd {
-    /// 拆分 PDF:每页一个独立 PDF
+    /// 拆分 PDF:默认每页一个;--ranges/--every-n/--parity 三选一(优先级 ranges > every_n > parity)
     Split {
         input: String,
+        #[arg(long, help = "自定义范围,如 \"1-3,5,7-10\"")]
+        ranges: Option<String>,
+        #[arg(long, help = "每 N 页一段")]
+        every_n: Option<u32>,
+        #[arg(long, help = "奇偶页分离(odd/even)")]
+        parity: Option<nextool_core::Parity>,
         #[arg(long)]
         output_dir: Option<String>,
     },
-    /// 旋转 PDF 所有页 90 度(顺时针)
+    /// 旋转 PDF 所有页(默认 90 度,--degrees 90/180/270)
     Rotate {
         input: String,
+        #[arg(long, default_value = "90")]
+        degrees: u32,
         #[arg(long)]
         output: Option<String>,
     },
@@ -59,6 +118,49 @@ enum PdfCmd {
         input: String,
         #[arg(long)]
         password: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 合并多个 PDF(顺序拼接,默认输出第一个文件旁)
+    Merge {
+        #[arg(required = true)]
+        files: Vec<String>,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 删除指定页(--pages 逗号分隔页号,如 \"2,4,6\")
+    DeletePages {
+        input: String,
+        #[arg(long)]
+        pages: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 提取指定页,删除其余(--pages 逗号分隔页号)
+    ExtractPages {
+        input: String,
+        #[arg(long)]
+        pages: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 设置元数据(--title/--author/--subject/--keywords,仅非空字段写入)
+    SetMetadata {
+        input: String,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long)]
+        author: Option<String>,
+        #[arg(long)]
+        subject: Option<String>,
+        #[arg(long)]
+        keywords: Option<String>,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 为每页添加右下角页码(1-based)
+    AddPageNumbers {
+        input: String,
         #[arg(long)]
         output: Option<String>,
     },
@@ -80,6 +182,54 @@ enum ImageCmd {
         width: u32,
         #[arg(long)]
         height: u32,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 图像裁剪(--x/--y/--width/--height 指定区域)
+    Crop {
+        input: String,
+        #[arg(long)]
+        x: u32,
+        #[arg(long)]
+        y: u32,
+        #[arg(long)]
+        width: u32,
+        #[arg(long)]
+        height: u32,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 图像翻转(--direction h/v)
+    Flip {
+        input: String,
+        #[arg(long)]
+        direction: nextool_core::FlipDirection,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 图像滤镜(--filter grayscale/invert/sepia/blur)
+    Filter {
+        input: String,
+        #[arg(long)]
+        filter: nextool_core::FilterKind,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// 亮度/对比度调整(--brightness i32/--contrast f32)
+    Adjust {
+        input: String,
+        #[arg(long, default_value = "0")]
+        brightness: i32,
+        #[arg(long, default_value = "1.0")]
+        contrast: f32,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// JPEG 压缩(--quality 1..=100)
+    CompressJpeg {
+        input: String,
+        #[arg(long)]
+        quality: u8,
         #[arg(long)]
         output: Option<String>,
     },
@@ -107,6 +257,52 @@ enum ArchiveCmd {
     Convert {
         input: String,
         target_format: nextool_core::ArchiveFormat,
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum EngineCmd {
+    /// 列出所有引擎及可用性(探测系统已装)
+    List,
+    /// 详细检查:每引擎状态 + 路径 + 是否便携版
+    Check,
+    /// 安装便携版引擎(ffmpeg/pandoc,自动下载解压)
+    Install { engine: String },
+    /// 音视频转换(ffmpeg,--to 指定目标格式如 mp3/wav/aac/mp4)
+    Av {
+        input: String,
+        #[arg(long)]
+        to: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// OCR 图片转文本(tesseract,输出源文件旁 .txt)
+    Ocr { input: String },
+}
+
+#[derive(Subcommand)]
+enum XlsxCmd {
+    /// XLSX → JSON(首个 sheet 转二维数组)
+    ToJson {
+        input: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+    /// JSON → XLSX(二维数组写首个 sheet)
+    FromJson {
+        input: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum ExtractCmd {
+    /// DOCX → TXT(Word 文档文本提取)
+    Docx {
+        input: String,
         #[arg(long)]
         output: Option<String>,
     },
@@ -171,16 +367,96 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 println!("已缩放 {out}");
                 Ok(())
             }
+            ImageCmd::Crop {
+                input,
+                x,
+                y,
+                width,
+                height,
+                output,
+            } => {
+                let out =
+                    nextool_core::crop_image_file(&input, x, y, width, height, output.as_deref())
+                        .map_err(|e| e.to_string())?;
+                println!("已裁剪 {out}");
+                Ok(())
+            }
+            ImageCmd::Flip {
+                input,
+                direction,
+                output,
+            } => {
+                let out = nextool_core::flip_image_file(&input, direction, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已翻转 {out}");
+                Ok(())
+            }
+            ImageCmd::Filter {
+                input,
+                filter,
+                output,
+            } => {
+                let out = nextool_core::filter_image_file(&input, filter, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已应用滤镜 {out}");
+                Ok(())
+            }
+            ImageCmd::Adjust {
+                input,
+                brightness,
+                contrast,
+                output,
+            } => {
+                let out = nextool_core::adjust_image_file(
+                    &input,
+                    brightness,
+                    contrast,
+                    output.as_deref(),
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已调整亮度/对比度 {out}");
+                Ok(())
+            }
+            ImageCmd::CompressJpeg {
+                input,
+                quality,
+                output,
+            } => {
+                let out =
+                    nextool_core::compress_jpeg_image_file(&input, quality, output.as_deref())
+                        .map_err(|e| e.to_string())?;
+                println!("已压缩 JPEG {out}");
+                Ok(())
+            }
         },
         FileConvCmd::Pdf { cmd } => match cmd {
-            PdfCmd::Split { input, output_dir } => {
-                let written = nextool_core::split_pdf(&input, output_dir.as_deref())
-                    .map_err(|e| e.to_string())?;
+            PdfCmd::Split {
+                input,
+                ranges,
+                every_n,
+                parity,
+                output_dir,
+            } => {
+                let written = if let Some(s) = ranges {
+                    let r = nextool_core::parse_page_ranges(&s).map_err(|e| e.to_string())?;
+                    nextool_core::split_pdf_ranges(&input, &r, output_dir.as_deref())
+                } else if let Some(n) = every_n {
+                    nextool_core::split_pdf_every_n(&input, n, output_dir.as_deref())
+                } else if let Some(p) = parity {
+                    nextool_core::split_pdf_parity(&input, p, output_dir.as_deref())
+                } else {
+                    nextool_core::split_pdf(&input, output_dir.as_deref())
+                }
+                .map_err(|e| e.to_string())?;
                 println!("已拆分为 {} 个 PDF", written.len());
                 Ok(())
             }
-            PdfCmd::Rotate { input, output } => {
-                let out = nextool_core::rotate_pdf(&input, output.as_deref())
+            PdfCmd::Rotate {
+                input,
+                degrees,
+                output,
+            } => {
+                let out = nextool_core::rotate_pdf(&input, degrees, output.as_deref())
                     .map_err(|e| e.to_string())?;
                 println!("已旋转 {out}");
                 Ok(())
@@ -205,6 +481,196 @@ pub fn run(args: FileConvArgs) -> Result<(), String> {
                 println!("已解密 {out}");
                 Ok(())
             }
+            PdfCmd::Merge { files, output } => {
+                let out = nextool_core::merge_pdfs(&files, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已合并 {out}");
+                Ok(())
+            }
+            PdfCmd::DeletePages {
+                input,
+                pages,
+                output,
+            } => {
+                let nums = parse_page_list(&pages)?;
+                let out = nextool_core::delete_pdf_pages(&input, &nums, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已删除页 {out}");
+                Ok(())
+            }
+            PdfCmd::ExtractPages {
+                input,
+                pages,
+                output,
+            } => {
+                let nums = parse_page_list(&pages)?;
+                let out = nextool_core::extract_pdf_pages(&input, &nums, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已提取页 {out}");
+                Ok(())
+            }
+            PdfCmd::SetMetadata {
+                input,
+                title,
+                author,
+                subject,
+                keywords,
+                output,
+            } => {
+                let out = nextool_core::set_pdf_metadata(
+                    &input,
+                    title.as_deref(),
+                    author.as_deref(),
+                    subject.as_deref(),
+                    keywords.as_deref(),
+                    output.as_deref(),
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已设置元数据 {out}");
+                Ok(())
+            }
+            PdfCmd::AddPageNumbers { input, output } => {
+                let out = nextool_core::add_pdf_page_numbers(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已添加页码 {out}");
+                Ok(())
+            }
         },
+        FileConvCmd::Font { cmd } => match cmd {
+            FontCmd::Convert {
+                input,
+                target,
+                output,
+            } => {
+                let out = nextool_core::convert_font_file(&input, target, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            FontCmd::Meta { input } => {
+                let text = nextool_core::read_font_meta_file(&input).map_err(|e| e.to_string())?;
+                println!("{text}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Svg { cmd } => match cmd {
+            SvgCmd::Convert {
+                input,
+                target,
+                output,
+            } => {
+                let out = nextool_core::convert_svg_file(&input, target, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已栅格化 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Engine { cmd } => match cmd {
+            EngineCmd::List => {
+                let statuses = nextool_core::engine_statuses(&nextool_core::SubprocessRunner);
+                for s in &statuses {
+                    let mark = if s.available { "✓" } else { "✗" };
+                    println!("{mark} {:<14} {}", s.binary, s.desc);
+                }
+                let avail = statuses.iter().filter(|s| s.available).count();
+                println!("已装 {avail}/{} 个引擎", statuses.len());
+                Ok(())
+            }
+            EngineCmd::Check => {
+                let infos = nextool_core::engine_install_infos();
+                for i in &infos {
+                    let mark = if i.available { "✓" } else { "✗" };
+                    let path = i.install_path.as_deref().unwrap_or(if i.is_portable {
+                        "未安装(便携版,可自动安装)"
+                    } else {
+                        "未安装(安装包,请手动下载安装)"
+                    });
+                    let portable_tag = if i.is_portable {
+                        "[便携]"
+                    } else {
+                        "[安装包]"
+                    };
+                    println!(
+                        "{mark} {:<14} {:<8} {}  {}",
+                        i.binary, portable_tag, i.desc, path
+                    );
+                }
+                let avail = infos.iter().filter(|i| i.available).count();
+                println!("\n已装 {avail}/{} 个引擎", infos.len());
+                if infos.iter().any(|i| !i.available && i.is_portable) {
+                    println!("可自动安装:nextool file-conv engine install <引擎名>");
+                }
+                Ok(())
+            }
+            EngineCmd::Install { engine } => {
+                let eng = nextool_core::parse_engine(&engine).map_err(|e| e.to_string())?;
+                let path = nextool_core::install_engine(eng).map_err(|e| e.to_string())?;
+                println!("已安装 {}: {path}", eng.binary());
+                Ok(())
+            }
+            EngineCmd::Av { input, to, output } => {
+                let out = nextool_core::engine_convert_file(
+                    &input,
+                    nextool_core::Engine::Ffmpeg,
+                    &to,
+                    output.as_deref(),
+                    &nextool_core::SubprocessRunner,
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            EngineCmd::Ocr { input } => {
+                let out = nextool_core::engine_convert_file(
+                    &input,
+                    nextool_core::Engine::Tesseract,
+                    "txt",
+                    None,
+                    &nextool_core::SubprocessRunner,
+                )
+                .map_err(|e| e.to_string())?;
+                println!("已识别 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Xlsx { cmd } => match cmd {
+            XlsxCmd::ToJson { input, output } => {
+                let out = nextool_core::xlsx_to_json_file(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+            XlsxCmd::FromJson { input, output } => {
+                let out = nextool_core::json_to_xlsx_file(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已转换 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Extract { cmd } => match cmd {
+            ExtractCmd::Docx { input, output } => {
+                let out = nextool_core::docx_to_text_file(&input, output.as_deref())
+                    .map_err(|e| e.to_string())?;
+                println!("已提取 {out}");
+                Ok(())
+            }
+        },
+        FileConvCmd::Convert { input, target } => {
+            let out = nextool_core::convert_any(&input, &target, &nextool_core::SubprocessRunner)
+                .map_err(|e| e.to_string())?;
+            println!("已转换 {out}");
+            Ok(())
+        }
     }
+}
+
+/// 解析逗号分隔页号列表 "2,4,6" → Vec<u32>
+fn parse_page_list(s: &str) -> Result<Vec<u32>, String> {
+    s.split(',')
+        .map(|p| {
+            p.trim()
+                .parse::<u32>()
+                .map_err(|e| format!("页号解析失败: {e}"))
+        })
+        .collect()
 }

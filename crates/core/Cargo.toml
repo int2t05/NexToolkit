@@ -18,6 +18,10 @@ strum = { version = "0.26", features = ["derive"] }
 urlencoding = "2.1"
 html-escape = "0.2"
 hex = "0.4"
+bs58 = "0.5"
+punycode = "0.4"
+quoted_printable = "0.5"
+encoding_rs = "0.8"
 
 # convert
 serde_yaml = "0.9"
@@ -45,9 +49,15 @@ similar = "2.5"
 
 # crypto
 aes-gcm = "0.10"
+chacha20poly1305 = "0.10"
 rsa = { version = "0.9", features = ["sha2"] }
+ed25519-dalek = { version = "2", features = ["pkcs8", "pem"] }
+pkcs8 = "0.10"
 argon2 = "0.5"
 pbkdf2 = { version = "0.12", features = ["std", "hmac"] }
+bcrypt = "0.15"
+scrypt = "0.11"
+crc = "3"
 
 # nettime
 ipnet = "2.9"
@@ -59,20 +69,36 @@ hickory-resolver = "0.24"
 # http(纯 Rust TLS,无 OpenSSL)
 ureq = { version = "2", features = ["tls"] }
 
-# fileconv — archive(feature-gated)
+# fileconv — archive(feature-gated):ZIP/TAR/GZ/7Z + BZ2/XZ/ZST 单文件压缩
 zip = { version = "2", optional = true }
 tar = { version = "0.4", optional = true }
 flate2 = { version = "1", optional = true }
 sevenz-rust2 = { version = "0.21", optional = true }
+bzip2 = { version = "0.6", optional = true }
+xz2 = { version = "0.1", optional = true }
+zstd = { version = "0.13", optional = true }
 
-# fileconv — image(feature-gated):仅常用栅格格式,控制体积
-image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "tiff", "ico"] }
+# fileconv — image(feature-gated):栅格格式(7 基础 + 7 扩展,DDS 仅解码)
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "tiff", "ico", "dds", "ff", "hdr", "exr", "pnm", "qoi", "tga"] }
 
 # fileconv — pdf(feature-gated):lopdf 默认关闭重依赖(rayon/jiff/image/serde)
 lopdf = { version = "0.44", optional = true, default-features = false }
 
+# fileconv — font(feature-gated):ttf-parser 读 name 表 + flate2 做 WOFF zlib 包装
+ttf-parser = { version = "0.25", optional = true }
+
+# fileconv — svg(feature-gated):resvg 栅格化(重导出 usvg/tiny-skia)+ image 编码 JPG
+resvg = { version = "0.48", optional = true }
+
+# fileconv — xlsx(feature-gated):电子表格读写(calamine 读 + rust_xlsxwriter 写)
+calamine = { version = "0.36", optional = true }
+rust_xlsxwriter = { version = "0.98", optional = true }
+
 [features]
-default = ["archive", "image", "pdf"]
-archive = ["dep:zip", "dep:tar", "dep:flate2", "dep:sevenz-rust2"]
+default = ["archive", "image", "pdf", "font", "svg", "xlsx"]
+archive = ["dep:zip", "dep:tar", "dep:flate2", "dep:sevenz-rust2", "dep:bzip2", "dep:xz2", "dep:zstd"]
 image = ["dep:image"]
 pdf = ["dep:lopdf"]
+font = ["dep:ttf-parser", "dep:flate2"]
+svg = ["dep:resvg", "image"]
+xlsx = ["dep:calamine", "dep:rust_xlsxwriter"]

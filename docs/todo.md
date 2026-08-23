@@ -8,21 +8,21 @@
 
 | 类别 | freeconvert 规模 | NexToolkit 现状 | 缺口数 |
 |---|---|---|---|
-| 文档转换 | ~30 格式 × N 组合 ≈ 325 对 | 5 对(MD→HTML + JSON↔YAML/TOML/CSV) | ~320 对 |
-| 音视频转换 | 30+ 格式 × N 组合 | 0(⚙ 框架就绪) | ~80 |
-| 图像转换 | 500+ 格式 | 7 格式全互转(42 对)+缩放 | ~450 对(含 RAW 单向) |
-| 电子书转换 | 30+ 转换 | 0(⚙ 框架就绪) | ~25 |
-| PDF 套件 | 15+ 工具 | 4(拆/转/加/解密) | ~20 |
-| 归档转换 | 50+ 转换 | zip/tar/gz/7z 解压 | ~15 |
-| 字体转换 | 6 格式互转 | 0 | ~10 |
-| 矢量转换 | 14+ 格式 | 0 | ~15 |
-| 编码/文本/加密/时间 | — | 54 工具已交付 | 补充 ~10 |
+| 文档转换 | ~30 格式 × N 组合 ≈ 325 对 | 15 对(MD→HTML/TXT + JSON↔YAML/TOML/CSV/XML + CSV↔TSV/YAML/XML + TSV↔JSON + YAML↔TOML/XML + TOML↔XML + PDF/DOCX→TXT) | ~310 对 |
+| 音视频转换 | 30+ 格式 × N 组合 | 6 引擎接线(ffmpeg 通用) | ~80 |
+| 图像转换 | 500+ 格式 | 14 格式互转(169 对,DDS 单向)+ 裁剪/翻转/滤镜/亮度/JPEG压缩 | ~322 对(含 RAW 单向) |
+| 电子书转换 | 30+ 转换 | 6 引擎接线(calibre 通用) | ~25 |
+| PDF 套件 | 15+ 工具 | 13(拆分4+旋转3角度+加解密+合并+删除/提取页+元数据+页码)+ 压缩/OCR(引擎) | ~18 |
+| 归档转换 | 50+ 转换 | zip/tar/targz/gz/7z + bz2/xz/zst(8 格式) | ~16 |
+| 字体转换 | 6 格式互转 | 3(TTF↔WOFF + 元数据) | ~9 |
+| 矢量转换 | 14+ 格式 | 2(SVG→PNG/JPG) | ~14 |
+| 编码/文本/加密/时间 | — | 107 文本工具 | 21 项 |
 
-**缺口总计:~945 对/项**(含互转对;不含已交付 54 工具)。下文逐类展开,含 N×M 互转矩阵。
+**缺口总计:~815 对/项**(含互转对;不含已交付 107 文本工具 + 34 文件工具)。下文逐类展开,含 N×M 互转矩阵。
 
 ---
 
-## 一、文档转换(最大缺口,当前仅 md→html 1 对)
+## 一、文档转换(最大缺口,当前 15 对)
 
 > **文档格式分四类**:Office 文档(Word/Excel/PPT)· 轻量标记(MD/HTML/TXT/RST/AsciiDoc/Org/Tex)· 电子表(CSV/JSON/YAML/TOML/XML)· PDF(见第五节 PDF 套件)。
 > 引擎:LibreOffice headless(Office 互转/Office↔PDF)+ pandoc(轻量标记互转)+ lopdf(PDF 文本提取)。
@@ -65,7 +65,7 @@
 | D-14 | PDF → DOCX(PDF to Word,文本+布局) | LibreOffice ⚙ / pdf-extract | ☐ ⚙ |
 | D-15 | PDF → XLSX(PDF to Excel,表格识别) | LibreOffice ⚙ / tabula-rs | ☐ ⚙ |
 | D-16 | PDF → PPTX | LibreOffice ⚙ | ☐ ⚙ |
-| D-17 | PDF → TXT(纯文本提取) | lopdf(纯 Rust) | ☐ |
+| D-17 | PDF → TXT(纯文本提取) | lopdf(纯 Rust) | ✓ |
 | D-18 | PDF → RTF | LibreOffice ⚙ | ☐ ⚙ |
 | D-19 | PDF → ODT | LibreOffice ⚙ | ☐ ⚙ |
 
@@ -79,7 +79,7 @@
 | D-21 | DOCX ↔ ODT | LibreOffice ⚙ | ☐ ⚙ |
 | D-22 | DOCX ↔ RTF | LibreOffice ⚙ / docx-rs | ☐ ⚙ |
 | D-23 | DOCX ↔ HTML | LibreOffice ⚙ / pandoc | ☐ ⚙ |
-| D-24 | DOCX ↔ TXT | 纯 Rust(zip+quick-xml 提文本) | ☐ |
+| D-24 | DOCX → TXT | 纯 Rust(zip+quick-xml) | ✓ |
 | D-25 | DOC ↔ ODT | LibreOffice ⚙ | ☐ ⚙ |
 | D-26 | DOC ↔ RTF | LibreOffice ⚙ | ☐ ⚙ |
 | D-27 | DOC ↔ HTML | LibreOffice ⚙ | ☐ ⚙ |
@@ -107,17 +107,17 @@
 | D-42 | XLS ↔ ODS | LibreOffice ⚙ | ☐ ⚙ |
 | D-43 | ODS ↔ CSV | LibreOffice ⚙ / 纯 Rust | ☐ ⚙ |
 | D-44 | ODS ↔ TSV | LibreOffice ⚙ | ☐ ⚙ |
-| D-45 | CSV ↔ TSV | 纯 Rust(分隔符替换) | ☐ |
+| D-45 | CSV ↔ TSV | 纯 Rust(分隔符替换) | ✓ |
 | D-46 | CSV ↔ JSON | ✓ 已交付(core) | ✓ |
-| D-47 | CSV ↔ YAML | 纯 Rust(经 json 中转) | ☐ |
-| D-48 | CSV ↔ XML | 纯 Rust | ☐ |
-| D-49 | TSV ↔ JSON | 纯 Rust | ☐ |
+| D-47 | CSV ↔ YAML | 纯 Rust(经 json 中转) | ✓ |
+| D-48 | CSV ↔ XML | 纯 Rust | ✓ |
+| D-49 | TSV ↔ JSON | 纯 Rust | ✓ |
 | D-50 | JSON ↔ YAML | ✓ 已交付 | ✓ |
 | D-51 | JSON ↔ TOML | ✓ 已交付 | ✓ |
-| D-52 | JSON ↔ XML | 纯 Rust(quick-xml 已有) | ☐ |
-| D-53 | YAML ↔ TOML | 纯 Rust(经 json 中转) | ☐ |
-| D-54 | YAML ↔ XML | 纯 Rust | ☐ |
-| D-55 | TOML ↔ XML | 纯 Rust | ☐ |
+| D-52 | JSON ↔ XML | 纯 Rust(quick-xml) | ✓ |
+| D-53 | YAML ↔ TOML | 纯 Rust(经 json 中转) | ✓ |
+| D-54 | YAML ↔ XML | 纯 Rust | ✓ |
+| D-55 | TOML ↔ XML | 纯 Rust | ✓ |
 | D-56 | JSON ↔ XLSX | rust_xlsxwriter | ☐ |
 
 ### 1.5 演示文稿互转(N×M)
@@ -146,7 +146,7 @@
 | D-65 | **MD ↔ HTML** | ✓ 已交付(pulldown-cmark) | ✓ |
 | D-66 | MD → PDF(MD→HTML→PDF 链路) | pandoc ⚙ / printpdf(纯 Rust) | ☐ |
 | D-67 | MD → DOCX | pandoc ⚙ / docx-rs(纯 Rust) | ☐ ⚙ |
-| D-68 | MD → TXT(去标记) | 纯 Rust(pulldown-cmark 提纯文本) | ☐ |
+| D-68 | MD → TXT(去标记) | pulldown-cmark | ✓ |
 | D-69 | MD → RST | pandoc ⚙ | ☐ ⚙ |
 | D-70 | MD → AsciiDoc(.adoc) | pandoc ⚙ | ☐ ⚙ |
 | D-71 | MD → Org | pandoc ⚙ | ☐ ⚙ |
@@ -195,9 +195,9 @@
 | 标记家族(MD/HTML/TXT/RST/AsciiDoc/Org/Tex/MediaWiki/Textile/OPML/IPYNB) | 11 | 110 | 1(MD→HTML) | 109 |
 | Office↔PDF(1.1+1.2) | — | 22(单向) | 0 | 22 |
 | 其他文档(CHM/DJVU/XPS/HWP/WPS/WPD/DBF) | 7 | ~14 | 0 | 14 |
-| **合计** | **~30 格式** | **~303 对 + 22 单向 = ~325** | **5** | **~320** |
+| **合计** | **~30 格式** | **~303 对 + 22 单向 = ~325** | **15** | **~310** |
 
-**关键发现**:文档是最大缺口(~325 对 vs 当前 5 对)。纯 Rust 可覆盖:表格家族经 JSON 中转链(CSV/TSV/JSON/YAML/TOML/XML 互转 ~30 对)+ DOCX/TXT 文本提取 + MD 纯文本。Office 互转与高质量 Office↔PDF 必须 LibreOffice。标记语言全互转必须 pandoc。
+**关键发现**:文档是最大缺口(~325 对 vs 当前 15 对)。纯 Rust 可覆盖:表格家族经 JSON 中转链(CSV/TSV/JSON/YAML/TOML/XML 互转 ~30 对)+ DOCX/TXT 文本提取 + MD 纯文本。Office 互转与高质量 Office↔PDF 必须 LibreOffice。标记语言全互转必须 pandoc。
 
 ---
 
@@ -303,62 +303,66 @@
 
 ---
 
-## 三、图像转换(7 格式已交付 → 全 N×M 互转矩阵)
+## 三、图像转换(14 格式已交付 → 全 N×M 互转矩阵)
 
-> 当前:`ImageFormat` 枚举仅暴露 PNG/JPEG/GIF/BMP/WebP/TIFF/ICO **7 格式**,且**已有全 N×M 互转**(image crate `load_from_memory` → `encode`,任意可解码 → 任意可编码)。
-> **缺口本质**:不是单向转换遗漏,而是**支持的格式种类太少** + **编解码能力不对等**(某些格式只能解码不能编码,反之亦然)。
+> 当前:`ImageFormat` 枚举暴露 14 格式(PNG/JPEG/GIF/BMP/WebP/TIFF/ICO/DDS/Farbfeld/HDR/OpenEXR/PNM/QOI/TGA),image crate `load_from_memory` → `encode`,任意可解码 → 任意可编码。
+> **缺口本质**:不是单向转换遗漏,而是**支持的格式种类太少** + **编解码能力不对等**(DDS 只能解码不能编码)。
 
-### 3.0 当前 7 格式互转矩阵(已交付,7×7=49 对含自转,42 对互转)
+### 3.0 当前 14 格式互转矩阵(已交付,169 对互转)
 
-> image crate `default-features = false`,仅启用 7 feature。下表 ✓ = 已支持(image crate 能力)。
+> image crate `default-features = false`,启用 14 feature。13 格式双向编解码,DDS 仅解码。
 
-| From \ To | PNG | JPEG | GIF | BMP | WebP | TIFF | ICO |
-|---|---|---|---|---|---|---|---|
-| **PNG** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **JPEG** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **GIF** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **BMP** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **WebP** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **TIFF** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **ICO** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 格式 | 扩展名 | 解码 | 编码 |
+|---|---|---|---|
+| PNG | `.png` | ✓ | ✓ |
+| JPEG | `.jpg` | ✓ | ✓ |
+| GIF | `.gif` | ✓ | ✓ |
+| BMP | `.bmp` | ✓ | ✓ |
+| WebP | `.webp` | ✓ | ✓ |
+| TIFF | `.tiff` | ✓ | ✓ |
+| ICO | `.ico` | ✓ | ✓ |
+| Farbfeld | `.ff` | ✓ | ✓ |
+| HDR | `.hdr` | ✓ | ✓ |
+| OpenEXR | `.exr` | ✓ | ✓ |
+| PNM | `.pbm/.pgm/.ppm/.pam` | ✓ | ✓ |
+| QOI | `.qoi` | ✓ | ✓ |
+| TGA | `.tga` | ✓ | ✓ |
+| DDS | `.dds` | ✓ | ✗(仅解码) |
 
-**结论**:7 格式内部 42 对互转**全部已交付**。无需补任何内部对。
+**互转对数**:13 双向格式 C(13,2)×2 = 156 对 + DDS 单向 → 13 格式 = 13 对,**共 169 对**。无需补任何内部对(DDS 反向需外部编码器,见 3.2)。
 
-### 3.1 image crate 可启用但未启用的格式(纯 Rust,feature gate 即可)
+### 3.1 image crate feature 格式(7 已交付,AVIF 待做)
 
-> image 0.25 `default-formats` 含 15 格式;NexToolkit 只启了 7。下表为**启用后立即获得的编解码能力**。
+> image 0.25 `default-formats` 含 15 格式;NexToolkit 已启用 14(下表 I-02~08),AVIF 因解码需 C 绑定(dav1d)暂缓。
 
-| # | 格式 | 扩展名 | 解码 | 编码 | 互转对数(与现 7 格式) | 依赖(feature) | 状态 |
-|---|---|---|---|---|---|---|---|
-| I-01 | AVIF | `.avif` | ✓(需 `avif-native` 或 dav1d) | ✓(ravif,纯 Rust) | +14(7 入 × 2 出 AVIF) | `avif` feature | ☐ 纯 Rust(编码)/ C 绑定(解码) |
-| I-02 | DDS | `.dds` | ✓ | ✗(只解码) | +7(DDS → 7 格式) | `dds` feature | ☐ 纯 Rust |
-| I-03 | Farbfeld | `.ff` | ✓ | ✓ | +14 | `ff` feature | ☐ 纯 Rust |
-| I-04 | HDR(Radiance) | `.hdr` | ✓ | ✓ | +14 | `hdr` feature | ☐ 纯 Rust |
-| I-05 | OpenEXR | `.exr` | ✓ | ✓ | +14 | `exr` feature | ☐ 纯 Rust |
-| I-06 | PNM | `.pbm/.pgm/.ppm/.pam` | ✓ | ✓ | +14(4 子格式 × 7) | `pnm` feature | ☐ 纯 Rust |
-| I-07 | QOI | `.qoi` | ✓ | ✓ | +14 | `qoi` feature | ☐ 纯 Rust |
-| I-08 | TGA | `.tga` | ✓ | ✓ | +14 | `tga` feature | ☐ 纯 Rust |
+| # | 格式 | 扩展名 | 解码 | 编码 | 依赖(feature) | 状态 |
+|---|---|---|---|---|---|---|
+| I-01 | AVIF | `.avif` | ✓(需 `avif-native` 或 dav1d) | ✓(ravif,纯 Rust) | `avif` feature | ☐ 纯 Rust(编码)/ C 绑定(解码) |
+| I-02 | DDS | `.dds` | ✓ | ✗(只解码) | `dds` feature | ✓ 纯 Rust(只解码) |
+| I-03 | Farbfeld | `.ff` | ✓ | ✓ | `ff` feature | ✓ 纯 Rust |
+| I-04 | HDR(Radiance) | `.hdr` | ✓ | ✓ | `hdr` feature | ✓ 纯 Rust |
+| I-05 | OpenEXR | `.exr` | ✓ | ✓ | `exr` feature | ✓ 纯 Rust |
+| I-06 | PNM | `.pbm/.pgm/.ppm/.pam` | ✓ | ✓ | `pnm` feature | ✓ 纯 Rust |
+| I-07 | QOI | `.qoi` | ✓ | ✓ | `qoi` feature | ✓ 纯 Rust |
+| I-08 | TGA | `.tga` | ✓ | ✓ | `tga` feature | ✓ 纯 Rust |
 
-**启用这 8 格式后新增互转对**:
-- 双向格式(AVIF/FF/HDR/EXR/PNM/QOI/TGA):7 × 2 × 7 = **98 对**
-- 单向格式(DDS 只解码):1 × 7 = **7 对**(DDS → 7 格式,反向需外部编码器)
-- **合计 +105 对**,仅需改 `Cargo.toml` feature 列表 + `ImageFormat` 枚举 + `detect`/`to_image_format` 映射。**纯 Rust,零新重依赖**(AVIF 解码除外)。
+AVIF 启用后新增 +28 对(14 入 × 2 出),仅需 `Cargo.toml` feature + `ImageFormat` 枚举扩展。解码依赖 C 绑定(dav1d),编码纯 Rust(ravif)。
 
 ### 3.2 新格式矩阵(image crate 不支持,需外部库)
 
-> 这些格式 image crate 无原生支持,需引入独立 crate 或 C 绑定。下表算与"已交付 7 格式 + 3.1 新增 8 格式 = 15 格式"的互转对数。
+> 这些格式 image crate 无原生支持,需引入独立 crate 或 C 绑定。下表算与"已交付 14 格式"的互转对数。
 
-| # | 格式 | 扩展名 | 解码库 | 编码库 | 互转对数(与 15 格式) | 状态 |
+| # | 格式 | 扩展名 | 解码库 | 编码库 | 互转对数(与 14 格式) | 状态 |
 |---|---|---|---|---|---|---|
-| I-09 | HEIC/HEIF | `.heic/.heif` | libheif(C 绑定) | libheif | +30(15 入 × 2 出) | ☐ C 绑定(高需求,Apple 格式) |
-| I-10 | RAW(CR2/CR3/CRW/ARW/NEF/DNG/RAF/ORF/RW2/PEF/3FR/DCR) | 各厂商扩展 | libraw(C) / rawloader(纯 Rust,部分格式) | ✗(一般只解码) | +12 格式 × 15 = +180 对(单向) | ☐ C 绑定 或 纯 Rust(部分) |
-| I-11 | PSD | `.psd` | psd crate(纯 Rust) | ✗(只解码) | +15(PSD → 15 格式) | ☐ 纯 Rust |
-| I-12 | SVG(矢量栅格化) | `.svg` | resvg/usvg(纯 Rust) | resvg | +30(SVG ↔ 15 栅格) | ☐ 纯 Rust |
-| I-13 | SVGZ | `.svgz` | flate2 + resvg | flate2 + resvg | +30 | ☐ 纯 Rust |
-| I-14 | EPS | `.eps` | Ghostscript | ✗ | +15(EPS → 15 格式) | ☐ ⚙ 引擎 |
-| I-15 | CUR(Windows 光标) | `.cur` | ico crate 复用(纯 Rust) | ✗ | +15(CUR → 15 格式) | ☐ 纯 Rust |
-| I-16 | APNG(动画 PNG) | `.apng` | image / libpng | image(首帧) | +15(APNG → 15,首帧) | ☐ 纯 Rust |
-| I-17 | 位图 → SVG(矢量追踪) | — | potrace(C 绑定) | potrace | +15(15 栅格 → SVG) | ☐ C 绑定 |
+| I-09 | HEIC/HEIF | `.heic/.heif` | libheif(C 绑定) | libheif | +28(14 入 × 2 出) | ☐ C 绑定(高需求,Apple 格式) |
+| I-10 | RAW(CR2/CR3/CRW/ARW/NEF/DNG/RAF/ORF/RW2/PEF/3FR/DCR) | 各厂商扩展 | libraw(C) / rawloader(纯 Rust,部分格式) | ✗(一般只解码) | +12 格式 × 14 = +168 对(单向) | ☐ C 绑定 或 纯 Rust(部分) |
+| I-11 | PSD | `.psd` | psd crate(纯 Rust) | ✗(只解码) | +14(PSD → 14 格式) | ☐ 纯 Rust |
+| I-12 | SVG(矢量栅格化) | `.svg` | resvg/usvg(纯 Rust) | resvg | +28(SVG ↔ 14 栅格) | ☐ 纯 Rust |
+| I-13 | SVGZ | `.svgz` | flate2 + resvg | flate2 + resvg | +28 | ☐ 纯 Rust |
+| I-14 | EPS | `.eps` | Ghostscript | ✗ | +14(EPS → 14 格式) | ☐ ⚙ 引擎 |
+| I-15 | CUR(Windows 光标) | `.cur` | ico crate 复用(纯 Rust) | ✗ | +14(CUR → 14 格式) | ☐ 纯 Rust |
+| I-16 | APNG(动画 PNG) | `.apng` | image / libpng | image(首帧) | +14(APNG → 14,首帧) | ☐ 纯 Rust |
+| I-17 | 位图 → SVG(矢量追踪) | — | potrace(C 绑定) | potrace | +14(14 栅格 → SVG) | ☐ C 绑定 |
 
 **RAW 详细(12 厂商格式)**:CR2/CR3/CRW(Canon)· ARW(Sony)· NEF(Nikon)· DNG(Adobe)· RAF(Fuji)· ORF(Olympus)· RW2(Panasonic)· PEF(Pentax)· 3FR(Hasselblad)· DCR(Kodak)· PEF/SR2(Sony)· X3F(Sigma)。`rawloader` 纯 Rust 支持 CR2/ARW/NEF/DNG/RAF/ORF 等 ~10 种;CR3/3FR/DCR 需 libraw。
 
@@ -366,17 +370,17 @@
 
 | # | 功能 | 依赖 | 状态 |
 |---|---|---|---|
-| I-18 | 图像裁剪(区域选取) | image(纯 Rust) | ☐ |
-| I-19 | 图像旋转/翻转(90/180/270/H/V) | image | ☐ |
+| I-18 | 图像裁剪(区域选取) | image(纯 Rust) | ✓ |
+| I-19 | 图像旋转/翻转(90/180/270/H/V) | image | ✓(翻转 H/V;旋转走 PDF/P-06) |
 | I-20 | 图像水印(文字/图片叠加) | image + rusttype | ☐ |
-| I-21 | 图像压缩(质量降低) | image/jpeg encoder | ☐ |
+| I-21 | 图像压缩(质量降低) | image/jpeg encoder | ✓ |
 | I-22 | 图像色彩深度(8/16/24/32 位) | image | ☐ |
-| I-23 | 图像滤镜(灰度/反相/棕褐/模糊) | image | ☐ |
+| I-23 | 图像滤镜(灰度/反相/棕褐/模糊) | image | ✓ |
 | I-24 | 图像 EXIF 查看/编辑/清除 | 纯 Rust(kamadak-exif) | ☐ |
 | I-25 | 图像 DPI/PPI 修改 | image | ☐ |
 | I-26 | 图像转 PDF(多图合并 PDF) | printpdf | ☐ |
 | I-27 | 图像批量调整大小 | image(已有 resize,缺批量入口) | ☐ |
-| I-28 | 图像颜色调整(亮度/对比度/饱和度) | image | ☐ |
+| I-28 | 图像颜色调整(亮度/对比度/饱和度) | image | ✓(亮度/对比度;饱和度待补) |
 | I-29 | 图像拼贴(多图拼接) | image | ☐ |
 | I-30 | 图像到 Word(DOCX 内嵌图) | 纯 Rust(docx-rs) | ☐ |
 
@@ -384,13 +388,12 @@
 
 | 层级 | 格式数 | 互转对数(双向,不含自转) | 状态 |
 |---|---|---|---|
-| 已交付 | 7 | 42 | ✓ |
-| +3.1 image feature 启用 | +8 → 15 | +105 → 147 | ☐ 纯 Rust(Cargo.toml 改) |
-| +3.2 外部库(HEIC/PSD/SVG/...) | +9 格式(不含 RAW) | +165 → 312 | ☐ 混合依赖 |
-| +3.2 RAW(12 厂商格式,单向) | +12 | +180(单向) → 492 | ☐ C 绑定/纯 Rust |
-| **理论合计** | **27 格式** | **~492 对** | — |
+| 已交付 | 14 | 169 | ✓ |
+| +3.2 外部库(HEIC/PSD/SVG/SVGZ/EPS/CUR/APNG/位图→SVG) | +8 → 22 | +154 → 323 | ☐ 混合依赖 |
+| +3.2 RAW(12 厂商格式,单向) | +12 → 34 | +168(单向) → 491 | ☐ C 绑定/纯 Rust |
+| **理论合计** | **34 格式** | **~491 对** | — |
 
-**关键发现**:当前 7 格式内部互转已完整,真正缺口是**格式种类**。P1(纯 Rust feature gate)即可 +105 对,是最高 ROI 的图像改进。
+**关键发现**:14 格式内部互转已完整(169 对),真正缺口是**格式种类**。P3(C 绑定 HEIC/RAW)与 P2(纯 Rust SVG/PSD)是主要扩展方向;AVIF(I-01)是唯一剩余的 feature-gate 项(+28 对,解码需 C 绑定)。
 
 ---
 
@@ -444,21 +447,21 @@
 
 ---
 
-## 五、PDF 套件(4 → ~20 项)
+## 五、PDF 套件(13 → ~18 项)
 
-> 已交付:拆分、旋转(全页 90°)、加密、解密。`lopdf` 纯 Rust。
-> 扩展方向:合并(手动页树)、压缩(Ghostscript)、OCR(tesseract)、页操作。
+> 已交付:拆分(每页/范围/每N页/奇偶)、旋转(90/180/270)、加密、解密、合并、删除页、提取页、元数据、页码。`lopdf` 纯 Rust。
+> 扩展方向:压缩(Ghostscript,引擎已接线)、OCR(tesseract,引擎已接线)、页操作(水印/重排/表单)、PDF→图片/Office。
 
 ### 5.1 已有功能增强
 
 | # | 功能 | 现状 | 扩展点 | 状态 |
 |---|---|---|---|---|
-| P-01 | PDF 拆分 | 每页一个 PDF | 自定义范围(1-3,5,7-10) | ☐ |
-| P-02 | PDF 拆分 | — | 每 N 页一个 PDF | ☐ |
-| P-03 | PDF 拆分 | — | 奇/偶页分离 | ☐ |
+| P-01 | PDF 拆分 | 每页一个 PDF | 自定义范围(1-3,5,7-10) | ✓ |
+| P-02 | PDF 拆分 | — | 每 N 页一个 PDF | ✓ |
+| P-03 | PDF 拆分 | — | 奇/偶页分离 | ✓ |
 | P-04 | PDF 拆分 | — | 半页拆分(双栏分离) | ☐ |
 | P-05 | PDF 旋转 | 全页 90° 顺时针 | 单页旋转(指定页码) | ☐ |
-| P-06 | PDF 旋转 | — | 180°/270° | ☐ |
+| P-06 | PDF 旋转 | — | 180°/270° | ✓ |
 | P-07 | PDF 旋转 | — | 按方向筛选(横/纵页) | ☐ |
 | P-08 | PDF 加密 | AES owner=user 同口令 | 权限分离(打印/复制/编辑限制) | ☐ |
 
@@ -466,23 +469,23 @@
 
 | # | 功能 | 依赖 | 状态 |
 |---|---|---|---|
-| P-09 | PDF 合并(多 PDF → 一) | lopdf 手动页树 | ☐ |
-| P-10 | PDF 压缩/优化 | Ghostscript | ☐ ⚙ |
-| P-11 | PDF OCR(扫描件转可搜索) | tesseract | ☐ ⚙ |
+| P-09 | PDF 合并(多 PDF → 一) | lopdf 手动页树 | ✓ |
+| P-10 | PDF 压缩/优化 | Ghostscript | ⚙ 引擎接线 |
+| P-11 | PDF OCR(扫描件转可搜索) | tesseract | ⚙ 引擎接线 |
 | P-12 | PDF 提取图片 | lopdf / pdf-extract | ☐ |
 | P-13 | PDF → JPG(每页为图片) | lopdf + pdfium / mupdf | ☐ |
 | P-14 | PDF → PNG | pdfium / mupdf | ☐ |
 | P-15 | PDF → Word(DOCX 文本提取) | lopdf + docx-rs | ☐ |
-| P-16 | PDF → TXT(纯文本提取) | lopdf 纯 Rust | ☐ |
+| P-16 | PDF → TXT(纯文本提取) | lopdf 纯 Rust | ✓ |
 | P-17 | PDF → PPTX | LibreOffice | ☐ ⚙ |
 | P-18 | PDF → EPUB | calibre | ☐ ⚙ |
 | P-19 | PDF 水印(文字/图片覆盖) | lopdf | ☐ |
 | P-20 | PDF 页重排(拖拽排序) | lopdf | ☐ |
-| P-21 | PDF 删除页 | lopdf | ☐ |
-| P-22 | PDF 提取页(范围 → 新 PDF) | lopdf | ☐ |
-| P-23 | PDF 元数据编辑(标题/作者/主题/关键词) | lopdf | ☐ |
+| P-21 | PDF 删除页 | lopdf | ✓ |
+| P-22 | PDF 提取页(范围 → 新 PDF) | lopdf | ✓ |
+| P-23 | PDF 元数据编辑(标题/作者/主题/关键词) | lopdf | ✓ |
 | P-24 | PDF 添加页眉/页脚 | lopdf | ☐ |
-| P-25 | PDF 添加页码 | lopdf | ☐ |
+| P-25 | PDF 添加页码 | lopdf | ✓ |
 | P-26 | PDF 展平表单(flatten) | lopdf | ☐ |
 | P-27 | PDF/A 转换(归档标准) | Ghostscript | ☐ ⚙ |
 | P-28 | PDF 数字签名(区别于 rsa_sign 文本签名) | 纯 Rust(rsa + lopdf) | ☐ |
@@ -505,14 +508,14 @@
 | R-03 | RAR → ZIP | unrar + zip | ☐ |
 | R-04 | RAR → 7Z | unrar + sevenz-rust2 | ☐ |
 | R-05 | RAR → TAR | unrar + tar | ☐ |
-| R-06 | BZ2 解压/压缩 | bzip2 crate | ☐ |
+| R-06 | BZ2 解压/压缩 | bzip2 crate | ✓ |
 | R-07 | BZ2 → ZIP | bzip2 + zip | ☐ |
 | R-08 | TAR.BZ2 ↔ ZIP | tar + bzip2 | ☐ |
-| R-09 | XZ 解压/压缩 | xz2 crate | ☐ |
+| R-09 | XZ 解压/压缩 | xz2 crate | ✓ |
 | R-10 | LZMA 解压 | xz2 | ☐ |
 | R-11 | CAB 解压(Windows 安装包) | cab crate | ☐ |
 | R-12 | ISO 解压(光盘镜像) | iso9660 / pure Rust | ☐ |
-| R-13 | Zstandard 解压/压缩 | zstd crate | ☐ |
+| R-13 | Zstandard 解压/压缩 | zstd crate | ✓ |
 
 ### 6.2 归档操作
 
@@ -536,12 +539,12 @@
 | # | 转换 | 依赖 | 状态 |
 |---|---|---|---|
 | F-01 | TTF → OTF | 纯 Rust(ttf-parser + write) | ☐ |
-| F-02 | TTF → WOFF | woff crate | ☐ |
+| F-02 | TTF → WOFF | 纯 Rust(flate2 包装) | ✓ |
 | F-03 | TTF → WOFF2 | woff2 crate / Brotli | ☐ |
 | F-04 | OTF → WOFF | woff crate | ☐ |
 | F-05 | OTF → WOFF2 | woff2 | ☐ |
 | F-06 | WOFF → WOFF2 | woff + woff2 | ☐ |
-| F-07 | WOFF2 → TTF | woff2 解码 | ☐ |
+| F-07 | WOFF → TTF | 纯 Rust | ✓ |
 | F-08 | EOT → TTF | 纯 Rust(EOT 解析简单) | ☐ |
 | F-09 | EOT → WOFF | EOT + woff | ☐ |
 | F-10 | SVG 字体 → TTF | fontTools / potrace | ☐ ⚙ |
@@ -550,7 +553,7 @@
 
 | # | 功能 | 状态 |
 |---|---|---|
-| F-11 | 字体元数据查看(名称/版权/字重) | ☐ |
+| F-11 | 字体元数据查看(名称/版权/字重) | ✓ |
 | F-12 | 字体子集化(精简字形) | ☐ |
 
 ---
@@ -561,8 +564,8 @@
 
 | # | 转换 | 依赖 | 状态 |
 |---|---|---|---|
-| VC-01 | SVG → PNG(栅格化) | resvg | ☐ |
-| VC-02 | SVG → JPG | resvg + image | ☐ |
+| VC-01 | SVG → PNG(栅格化) | resvg | ✓ |
+| VC-02 | SVG → JPG | resvg + image | ✓ |
 | VC-03 | SVG → PDF | resvg + printpdf | ☐ |
 | VC-04 | EMF → PNG | libemf(C 绑定) | ☐ |
 | VC-05 | EMF → SVG | libemf | ☐ |
@@ -580,48 +583,48 @@
 
 ---
 
-## 九、编码/文本/加密/时间(已交付 54,补充 ~10 项)
+## 九、编码/文本/加密/时间(已交付 107,补充 21 项)
 
-> 已覆盖:base64/url/html/hex/jwt、json/yaml/toml/csv/md、hash/hmac/uuid/password/lorem/qr、case/sort/dedup/reverse/regex/diff、aes-gcm/rsa/kdf、ipcalc/timestamp/cron/dns/http、unit 10 类。
+> 已覆盖:base64/url/html/hex/jwt/base32/58/85/punycode/qp/morse/braille/零宽、json/yaml/toml/csv/xml互转/md、hash/hmac/hmac-multi/uuid/password/lorem/qr、case/sort/dedup/reverse/regex/diff/stats/trim/tab↔space/align/replace/escape/number-lines、aes-gcm/chacha20/rsa/ed25519/kdf/bcrypt/crc、ipcalc/timestamp/cron/dns/http、unit 10 类。
 
 ### 9.1 编码补充
 
 | # | 功能 | 状态 |
 |---|---|---|
-| T-01 | Base32 编解码 | ☐ 纯 Rust |
-| T-02 | Base58 编解码 | ☐ 纯 Rust |
-| T-03 | Base85/Ascii85 编解码 | ☐ 纯 Rust |
-| T-04 | Punycode 编解码(域名) | ☐ 纯 Rust |
-| T-05 | Quoted-Printable 编解码 | ☐ 纯 Rust |
-| T-06 | Morse 编解码 | ☐ 纯 Rust |
-| T-07 | Braille 编解码 | ☐ 纯 Rust |
-| T-08 | Binary ↔ 文本(零宽字符隐写) | ☐ 纯 Rust |
+| T-01 | Base32 编解码 | ✓ 纯 Rust(RFC 4648) |
+| T-02 | Base58 编解码 | ✓ 纯 Rust(bs58,Bitcoin) |
+| T-03 | Base85/Ascii85 编解码 | ✓ 纯 Rust(Ascii85 Adobe) |
+| T-04 | Punycode 编解码(域名) | ✓ 纯 Rust(RFC 3492) |
+| T-05 | Quoted-Printable 编解码 | ✓ 纯 Rust(RFC 2045) |
+| T-06 | Morse 编解码 | ✓ 纯 Rust(国际摩斯码) |
+| T-07 | Braille 编解码 | ✓ 纯 Rust(Unicode 6 点) |
+| T-08 | Binary ↔ 文本(零宽字符隐写) | ✓ 纯 Rust(U+200B/200C) |
 
 ### 9.2 文本处理补充
 
 | # | 功能 | 状态 |
 |---|---|---|
-| T-09 | 文本统计(字数/行数/字符数/字节) | ☐ 纯 Rust |
-| T-10 | 文本去空行/去首尾空格 | ☐ 纯 Rust |
-| T-11 | 文本 Tab ↔ 空格转换 | ☐ 纯 Rust |
-| T-12 | 文本 padding/对齐(左/右/居中) | ☐ 纯 Rust |
-| T-13 | 文本查找替换(多行/正则/大小写) | ☐ 扩展现有 regex |
-| T-14 | 文本转义/反转义(Shell/C/regex) | ☐ 纯 Rust |
-| T-15 | 文本行号添加 | ☐ 纯 Rust |
+| T-09 | 文本统计(字数/行数/字符数/字节) | ✓ 纯 Rust |
+| T-10 | 文本去空行/去首尾空格 | ✓ 纯 Rust |
+| T-11 | 文本 Tab ↔ 空格转换 | ✓ 纯 Rust |
+| T-12 | 文本 padding/对齐(左/右/居中) | ✓ 纯 Rust |
+| T-13 | 文本查找替换(多行/正则/大小写) | ✓ 扩展现有 regex |
+| T-14 | 文本转义/反转义(Shell/C/regex) | ✓ 纯 Rust |
+| T-15 | 文本行号添加 | ✓ 纯 Rust |
 | T-16 | 文本 Markdown 预览增强(表格/任务列表) | ☐ 扩展现有 md→html |
 
 ### 9.3 加密补充
 
 | # | 功能 | 状态 |
 |---|---|---|
-| T-17 | ChaCha20-Poly1305 加解密 | ☐ 纯 Rust(chacha20poly1305 crate) |
+| T-17 | ChaCha20-Poly1305 加解密 | ✓ 纯 Rust(chacha20poly1305 crate) |
 | T-18 | DES/3DES 加解密(遗留兼容) | ☐ 纯 Rust |
-| T-19 | Ed25519 签名/验签 | ☐ 纯 Rust(ed25519-dalek) |
+| T-19 | Ed25519 签名/验签 | ✓ 纯 Rust(ed25519-dalek) |
 | T-20 | ECDSA 签名/验签 | ☐ 纯 Rust |
-| T-21 | Bcrypt 密码哈希 | ☐ 纯 Rust |
-| T-22 | Scrypt KDF | ☐ 纯 Rust |
-| T-23 | HMAC 多算法扩(SHA224/384/512) | ☐ 扩展现有 |
-| T-24 | CRC32/CRC64 校验 | ☐ 纯 Rust |
+| T-21 | Bcrypt 密码哈希 | ✓ 纯 Rust |
+| T-22 | Scrypt KDF | ✓ 纯 Rust |
+| T-23 | HMAC 多算法扩(SHA224/384/512) | ✓ 扩展现有 |
+| T-24 | CRC32/CRC64 校验 | ✓ 纯 Rust |
 
 ### 9.4 网络/时间补充
 
@@ -700,33 +703,33 @@
 
 ```mermaid
 flowchart TD
-  P1["P1 · 纯 Rust 低成本<br/>T-01~08 编码 · I-46~53 图像处理<br/>P-01~08 PDF 增强 · D-11/17/27 文本提取"]
-  P2["P2 · 纯 Rust 新模块<br/>F-01~12 字体 · VC-01~03 SVG · D-18/31/33 表格"]
-  P3["P3 · C 绑定(需评估体积)<br/>I-01~12 HEIC/AVIF · I-13~26 RAW · R-02 RAR"]
-  P4["P4 · 引擎接线(⚙ 框架就绪)<br/>V/A 音视频 · E 电子书 · D-01~10 Office↔PDF"]
-  P5["P5 · 高难度纯 Rust<br/>P-09 PDF 合并 · P-28 PDF 签名 · R-01 7z 创建"]
+  P1["P1 · 纯 Rust 低成本(大部分 ✓)<br/>I-02~08 图像格式 · T-01~15 编码/文本<br/>P-01~03/06 PDF · D-17/24/45~55/68 文本/表格 ✓"]
+  P2["P2 · 纯 Rust 新模块<br/>F-01/03~10/12 字体 · VC-03~16 矢量 · D-35/38/39 XLSX"]
+  P3["P3 · C 绑定(需评估体积)<br/>I-01 AVIF · I-09~10 HEIC/RAW · R-02 RAR"]
+  P4["P4 · 引擎接线(⚙ 已接线,待进度 Channel)<br/>V/A 音视频 · E 电子书 · D-01~13 Office↔PDF · D-66~88 标记"]
+  P5["P5 · 高难度纯 Rust<br/>P-28 PDF 签名 · R-01 7z 创建 · P-12/13 PDF 提取图片"]
   P6["P6 · 远期/智能层<br/>ENG-06~08 插件/Smart/Recipe"]
 
   P1 --> P2 --> P3 --> P4 --> P5 --> P6
 ```
 
-### P1 · 纯 Rust 低成本(立即可做,无新重依赖)
+### P1 · 纯 Rust 低成本(大部分已交付)
 
-- **图像 +105 对**(I-01~08):`Cargo.toml` feature 列表加 `avif/dds/ff/hdr/exr/pnm/qoi/tga` + `ImageFormat` 枚举扩展。零新重依赖(AVIF 编码纯 Rust ravif,解码可选 C)。**最高 ROI**。
-- 编码补充 T-01~08(Base32/58/85/Punycode/QP/Morse/Braille/零宽)
-- 图像处理 I-18~25(裁剪/旋转/水印/压缩/滤镜/EXIF/DPI,均 `image` crate)
-- PDF 增强 P-01~08(自定义拆分/单页旋转/权限分离,均 `lopdf` 纯 Rust)
-- 文本提取:D-17(PDF→TXT)、D-24(DOCX↔TXT 纯 Rust)、D-68(MD→TXT)
-- 表格中转链:D-45/47/48/49/52~56(CSV/TSV/JSON/YAML/TOML/XML 互转,纯 Rust,已有 json/yaml/toml/csv 基础)
-- TXT→PDF D-89 / TXT→DOCX D-90 / TXT→HTML D-91(纯 Rust)
+- 图像 feature 格式 I-02~08(DDS/Farbfeld/HDR/EXR/PNM/QOI/TGA)✓;AVIF I-01 待做(解码需 C 绑定)
+- 编码补充 T-01~08(Base32/58/85/Punycode/QP/Morse/Braille/零宽)✓;文本补充 T-09~15 ✓
+- 图像处理 I-18~25:裁剪/翻转/滤镜/压缩/亮度对比度 ✓;水印/色彩深度/EXIF/DPI(I-20/22/24/25)待做
+- PDF 增强 P-01~03/06(拆分范围/每N页/奇偶/旋转角度)✓;P-04/05/07/08(半页拆分/单页旋转/方向筛选/权限分离)待做
+- 文本提取:D-17(PDF→TXT)✓、D-24(DOCX→TXT)✓、D-68(MD→TXT)✓
+- 表格中转链 D-45~55(CSV/TSV/JSON/YAML/TOML/XML 互转)✓
+- TXT→PDF D-89 / TXT→DOCX D-90 / TXT→HTML D-91(纯 Rust,待做)
 
 ### P2 · 纯 Rust 新模块(需引入轻量 crate)
 
-- 字体转换 F-01~12(`ttf-parser` + `woff` crate)
-- SVG 栅格化 VC-01~03(`resvg`/`usvg`,+30 对 SVG↔栅格)
-- XLSX 读写 D-35/38/39(`calamine` + `rust_xlsxwriter`)
+- 字体转换 F-01/03~10/12(`ttf-parser` + `woff` crate;F-02/07/11 ✓)
+- SVG 栅格化 VC-03~16(VC-01/02 ✓;`resvg`/`usvg`,+28 对 SVG↔栅格)
+- XLSX 读写 D-35/38/39(`calamine` + `rust_xlsxwriter`;XLSX↔JSON 已有)
 - 图像转 PDF I-26(`printpdf`)
-- DOCX 纯 Rust 读写(`docx-rs`,D-24/67/78/90 部分)
+- DOCX 纯 Rust 读写(`docx-rs`,D-67/78/90 部分)
 - 图像矢量追踪 I-17 / VC-15(`potrace` C 绑定,评估)
 
 ### P3 · C 绑定(需评估体积与编译复杂度)
@@ -747,7 +750,6 @@ flowchart TD
 
 ### P5 · 高难度纯 Rust
 
-- PDF 合并 P-09(lopdf 手动页树 + 资源迁移,参考 todo 旧条目)
 - PDF 数字签名 P-28(rsa + lopdf PKCS#7)
 - 7z 创建 R-01(sevenz-rust2 writer 深入)
 - PDF 提取图片 P-12 / PDF→JPG P-13(需 pdfium/mupdf C 绑定)
@@ -763,17 +765,22 @@ flowchart TD
 ## 引擎层接线设计(对接 codebase-audit.md 接缝 C)
 
 > `core::fileconv::engine` 已实现 `EngineRunner` port + `SubprocessRunner`(prod)+ `FakeRunner`(test)+ `engine_convert`/`engine_convert_file`。
-> 接线步骤(每个引擎独立,不阻塞其他):
+> **接线状态**:6 引擎已接线通用 CLI/GUI 命令(`file-conv engine <av|office-to-pdf|ebook|markup|pdf-compress|ocr>`),运行时探测系统已装,未装返回明确错误。各引擎经 `engine_convert_file` 统一落盘。进度流(Tauri Channel)待做。
 
-1. **ffmpeg 接线**(音视频):`engine_convert(engine, input, output, &SubprocessRunner)` + Tauri Channel 进度流(解析 ffmpeg stderr `frame=` 行)
-2. **LibreOffice 接线**(Office↔PDF):同上,无进度行,用文件大小增长估算
-3. **calibre 接线**(电子书):同上,ebook-convert 有百分比输出
-4. **Ghostscript 接线**(PDF 压缩):同上
-5. **tesseract 接线**(OCR):同上,有进度百分比
+| 引擎 | 命令 | 覆盖 todo 项 | 状态 |
+|---|---|---|---|
+| ffmpeg | `engine av --to` | V-01~26 音视频互转 | ✓ 接线 |
+| LibreOffice | `engine office-to-pdf` | D-01~13 Office→PDF | ✓ 接线 |
+| calibre | `engine ebook --to` | E-01~22 电子书 | ✓ 接线 |
+| pandoc | `engine markup --to` | D-66~88 标记语言互转 | ✓ 接线 |
+| Ghostscript | `engine pdf-compress` | P-10 PDF 压缩 | ✓ 接线 |
+| tesseract | `engine ocr` | P-11 OCR | ✓ 接线 |
 
-每个引擎接线的 `fs_util` 包装(`engine_convert_file`)负责:读输入路径 → 调 `engine_convert` → 产物落盘(碰撞处理)。与 archive/image/pdf 的 `fs_util` 模式一致。
+每个引擎接线的 `fs_util` 包装(`engine_convert_file`)负责:读输入路径 → 调 `engine_convert` → 产物落盘(同扩展名自动 `_converted` 后缀避免覆盖源)。
 
 **原则:** 重引擎不打包进核心,运行时探测系统已装,首次使用提示安装。数据纯本地。
+
+**待做**:进度流(长任务 Tauri Channel 推送)、引擎高级参数(ffmpeg CRF/编码、LibreOffice 格式过滤等)、PDF→Office 反向(D-14~19 高质量布局,LibreOffice 有限)。
 
 ---
 
@@ -801,4 +808,4 @@ flowchart TD
 | ConvertHub | https://converthub.com/ebook | 电子书格式对照 |
 | FreeFileConvert | https://freefileconvert.com/formats | 完整格式清单(500+ 图像格式) |
 
-`UNVERIFIED:` freeconvert 声称 1500+/2000+ 转换含大量冷门格式对(如 3FR→DDS),实际高频需求约 200 项,本 todo 聚焦高频。
+`以下未核实:` freeconvert 声称 1500+/2000+ 转换含大量冷门格式对(如 3FR→DDS),实际高频需求约 200 项,本 todo 聚焦高频。

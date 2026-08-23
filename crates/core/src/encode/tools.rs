@@ -3,8 +3,11 @@
 use crate::registry::{OutputKind, ParamKind, ParamSpec, Tool, ToolArgs, ToolMeta};
 
 use super::{
-    base64_decode, base64_encode, hex_decode, hex_encode, html_decode, html_encode, jwt_decode,
-    jwt_verify, url_decode, url_encode,
+    base32_decode, base32_encode, base58_decode, base58_encode, base64_decode, base64_encode,
+    base85_decode, base85_encode, braille_decode, braille_encode, charset_decode, charset_encode,
+    hex_decode, hex_encode, html_decode, html_encode, jwt_decode, jwt_verify, morse_decode,
+    morse_encode, punycode_decode, punycode_encode, quoted_printable_decode,
+    quoted_printable_encode, url_decode, url_encode, zero_width_decode, zero_width_encode,
 };
 
 pub struct Base64Encode;
@@ -203,5 +206,387 @@ impl Tool for JwtVerify {
     fn run(&self, input: &str, args: &ToolArgs) -> crate::ToolResult<String> {
         let key = args.get_str("key")?;
         jwt_verify(input, key)
+    }
+}
+
+pub struct Base32Encode;
+impl Tool for Base32Encode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "base32_encode",
+            name: "Base32 编码",
+            desc: "RFC 4648 标准 Base32 编码(A-Z2-7,含 padding)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        base32_encode(input)
+    }
+}
+
+pub struct Base32Decode;
+impl Tool for Base32Decode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "base32_decode",
+            name: "Base32 解码",
+            desc: "RFC 4648 标准 Base32 解码(容忍大小写与首尾空白)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        base32_decode(input)
+    }
+}
+
+pub struct Base58Encode;
+impl Tool for Base58Encode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "base58_encode",
+            name: "Base58 编码",
+            desc: "Bitcoin 字母表 Base58 编码",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        base58_encode(input)
+    }
+}
+
+pub struct Base58Decode;
+impl Tool for Base58Decode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "base58_decode",
+            name: "Base58 解码",
+            desc: "Bitcoin 字母表 Base58 解码(容忍首尾空白)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        base58_decode(input)
+    }
+}
+
+pub struct Base85Encode;
+impl Tool for Base85Encode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "base85_encode",
+            name: "Base85 编码",
+            desc: "Ascii85 编码(Adobe 变体,`!` 起始,`z` 零字节简写)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        base85_encode(input)
+    }
+}
+
+pub struct Base85Decode;
+impl Tool for Base85Decode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "base85_decode",
+            name: "Base85 解码",
+            desc: "Ascii85 解码(Adobe 变体,含 `z` 零字节简写)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        base85_decode(input)
+    }
+}
+
+pub struct PunycodeEncode;
+impl Tool for PunycodeEncode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "punycode_encode",
+            name: "Punycode 编码",
+            desc: "Unicode 域名标签编码为 xn-- 前缀的 Punycode(RFC 3492)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        punycode_encode(input)
+    }
+}
+
+pub struct PunycodeDecode;
+impl Tool for PunycodeDecode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "punycode_decode",
+            name: "Punycode 解码",
+            desc: "xn-- Punycode 域名标签解码为 Unicode(RFC 3492)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        punycode_decode(input)
+    }
+}
+
+pub struct QuotedPrintableEncode;
+impl Tool for QuotedPrintableEncode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "quoted_printable_encode",
+            name: "Quoted-Printable 编码",
+            desc: "RFC 2045 Quoted-Printable 编码(ASCII 安全传输)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        quoted_printable_encode(input)
+    }
+}
+
+pub struct QuotedPrintableDecode;
+impl Tool for QuotedPrintableDecode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "quoted_printable_decode",
+            name: "Quoted-Printable 解码",
+            desc: "RFC 2045 Quoted-Printable 解码",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        quoted_printable_decode(input)
+    }
+}
+
+pub struct MorseEncode;
+impl Tool for MorseEncode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "morse_encode",
+            name: "Morse 编码",
+            desc: "国际摩斯码编码(A-Z 0-9,字母间空格,单词间 / )",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        morse_encode(input)
+    }
+}
+
+pub struct MorseDecode;
+impl Tool for MorseDecode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "morse_decode",
+            name: "Morse 解码",
+            desc: "国际摩斯码解码(点划 → 文本)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        morse_decode(input)
+    }
+}
+
+pub struct BrailleEncode;
+impl Tool for BrailleEncode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "braille_encode",
+            name: "Braille 编码",
+            desc: "文本 → Unicode 盲文字符(a-z + 空格,6 点基本盲文)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        braille_encode(input)
+    }
+}
+
+pub struct BrailleDecode;
+impl Tool for BrailleDecode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "braille_decode",
+            name: "Braille 解码",
+            desc: "Unicode 盲文字符 → 文本",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        braille_decode(input)
+    }
+}
+
+pub struct ZeroWidthEncode;
+impl Tool for ZeroWidthEncode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "zero_width_encode",
+            name: "零宽字符隐写编码",
+            desc: "文本 → 零宽字符序列(U+200B=0,U+200C=1,每字节 8 字符)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        zero_width_encode(input)
+    }
+}
+
+pub struct ZeroWidthDecode;
+impl Tool for ZeroWidthDecode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "zero_width_decode",
+            name: "零宽字符隐写解码",
+            desc: "零宽字符序列 → 文本(提取 U+200B/U+200C 隐写数据)",
+            group: "encode",
+            params: &[],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, _args: &ToolArgs) -> crate::ToolResult<String> {
+        zero_width_decode(input)
+    }
+}
+
+pub struct CharsetEncode;
+impl Tool for CharsetEncode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "charset_encode",
+            name: "字符编码",
+            desc: "文本 → 指定字符集(GBK/Big5/Shift_JIS 等)hex 字节",
+            group: "encode",
+            params: &[ParamSpec {
+                key: "charset",
+                kind: ParamKind::Select,
+                label: "字符集",
+                default: Some("gbk"),
+                options: &[
+                    "utf-8",
+                    "gbk",
+                    "gb2312",
+                    "gb18030",
+                    "big5",
+                    "shift_jis",
+                    "euc-jp",
+                    "euc-kr",
+                    "iso-8859-1",
+                    "windows-1252",
+                ],
+                placeholder: None,
+                multiple: false,
+            }],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, args: &ToolArgs) -> crate::ToolResult<String> {
+        let charset = args.get("charset").unwrap_or("gbk");
+        charset_encode(input, charset)
+    }
+}
+
+pub struct CharsetDecode;
+impl Tool for CharsetDecode {
+    fn meta(&self) -> &'static ToolMeta {
+        static META: ToolMeta = ToolMeta {
+            id: "charset_decode",
+            name: "字符解码",
+            desc: "hex 字节 → 指定字符集文本(GBK/Big5/Shift_JIS 等)",
+            group: "encode",
+            params: &[ParamSpec {
+                key: "charset",
+                kind: ParamKind::Select,
+                label: "字符集",
+                default: Some("gbk"),
+                options: &[
+                    "utf-8",
+                    "gbk",
+                    "gb2312",
+                    "gb18030",
+                    "big5",
+                    "shift_jis",
+                    "euc-jp",
+                    "euc-kr",
+                    "iso-8859-1",
+                    "windows-1252",
+                ],
+                placeholder: None,
+                multiple: false,
+            }],
+            needs_main_input: true,
+            output_kind: OutputKind::Text,
+        };
+        &META
+    }
+    fn run(&self, input: &str, args: &ToolArgs) -> crate::ToolResult<String> {
+        let charset = args.get("charset").unwrap_or("gbk");
+        charset_decode(input, charset)
     }
 }

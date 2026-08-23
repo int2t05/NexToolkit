@@ -30,7 +30,7 @@ flowchart TD
 NexToolkit/
 ├── Cargo.toml                # workspace + 共享 release profile
 ├── crates/
-│   ├── core/                 # 统一工具层:文本域(&str→String)+ 字节域(&[u8]→Vec[u8]),按种类子文件夹(mod.rs 逻辑 + tools.rs 注册)+ registry 聚合 54 文本工具,可独立单测
+│   ├── core/                 # 统一工具层:文本域(&str→String)+ 字节域(&[u8]→Vec[u8]),按种类子文件夹(mod.rs 逻辑 + tools.rs 注册)+ registry 聚合 107 文本工具,可独立单测
 │   │   └── src/fileconv/     # 文件转换(字节域):archive/image/pdf 纯内存 + engine 子进程 trait port + fs_util IO 边界
 │   ├── cli/                  # clap 子命令,调 core;tests/cli_smoke.rs 集成测试
 │   └── tauri-app/            # Tauri command 薄封装 + tauri.conf.json + capabilities
@@ -45,9 +45,9 @@ NexToolkit/
 core 统一承载文本域(`&str→String`)与字节域(`&[u8]→Vec<u8>`)。归档/图像是二进制数据,强制 String 会引入 base64 开销与 UTF-8 错误风险,故字节域独立子模块 `fileconv/`(非独立 crate)。字节域复用 core 根的 `ToolError`(单一错误定义,无新变体),分模块:
 
 - `archive` 模块:归档纯内存逻辑(解压/压缩/互转/检测/路径安全,含 7z 解压),feature gate。
-- `image` 模块:图像纯内存逻辑(格式互转/缩放/检测),feature gate;仅启用常用栅格格式(png/jpeg/gif/bmp/webp/tiff/ico)控制体积。
-- `pdf` 模块:PDF 纯内存逻辑(拆分/旋转/加密/解密/加密检测),feature gate;lopdf default-features=false 去重依赖。
-- `engine` 模块:外部引擎子进程桥接(ffmpeg/LibreOffice/calibre/ghostscript/tesseract),`EngineRunner` trait port + `SubprocessRunner`(prod)+ `FakeRunner`(test,可 mock),运行时探测 + 命令构造,无 feature gate。
+- `image` 模块:图像纯内存逻辑(格式互转/缩放/裁剪/翻转/滤镜/亮度/压缩/检测),feature gate;启用 14 栅格格式(png/jpeg/gif/bmp/webp/tiff/ico/dds/farbfeld/hdr/openexr/pnm/qoi/tga,DDS 仅解码)控制体积。
+- `pdf` 模块:PDF 纯内存逻辑(拆分/旋转/加密/解密/合并/删除页/提取页/元数据/页码),feature gate;lopdf default-features=false 去重依赖。
+- `engine` 模块:外部引擎子进程桥接(ffmpeg/LibreOffice/calibre/pandoc/ghostscript/tesseract),`EngineRunner` trait port + `SubprocessRunner`(prod)+ `FakeRunner`(test,可 mock),运行时探测 + 命令构造,无 feature gate。
 - `path` 模块:纯字符串路径计算(产物路径 + 碰撞后缀),无 feature gate,各域复用。
 - `fs_util` 模块:IO 边界,组合各域纯逻辑 + `std::fs` 落盘;`write_output`/`retry_unique` 抽取消重复,补 `list_archive_file`/`is_pdf_encrypted_file`/`engine_convert_file`,函数级 feature gate,供 CLI/GUI 共享。
 
@@ -79,15 +79,15 @@ impl Tool for Base64Encode {
 }
 ```
 
-文本工具采用统一 `Tool` trait(元数据 + 字符串参数执行一体),54 个文本工具经 `registry::tools()` 自描述供 GUI 动态渲染;文件工具(字节域/路径)I/O 模型不同不进此 trait,保留各自类型化命令。设计参考 CyberChef `Operation`(`reference/competitors/CyberChef/src/core/operations/`)与 DevToys 同工具双接口(`reference/competitors/DevToys/src/app/dev/DevToys.Api/`),实现时简化。
+文本工具采用统一 `Tool` trait(元数据 + 字符串参数执行一体),107 个文本工具经 `registry::tools()` 自描述供 GUI 动态渲染;文件工具(字节域/路径)I/O 模型不同不进此 trait,保留各自类型化命令。设计参考 CyberChef `Operation`(`reference/competitors/CyberChef/src/core/operations/`)与 DevToys 同工具双接口(`reference/competitors/DevToys/src/app/dev/DevToys.Api/`),实现时简化。
 
 ## 工具注册表
 
-`registry.rs` 定义 `Tool` trait(`meta()` 返回静态元数据 + `run()` 字符串参数执行)与配套类型:`ToolMeta`(id/名称/分组/参数 schema/needs_main_input/output_kind)、`ParamSpec`/`ParamKind`(UI 渲染 + 字符串解析)、`OutputKind`(Text/Highlight/Svg)、`ToolArgs`(类型强转 helper,消除每工具手写 parse)。`tools()` 返回全部 54 个注册工具,`find_tool()` 按 id 查找供 `run_tool` 分发。
+`registry.rs` 定义 `Tool` trait(`meta()` 返回静态元数据 + `run()` 字符串参数执行)与配套类型:`ToolMeta`(id/名称/分组/参数 schema/needs_main_input/output_kind)、`ParamSpec`/`ParamKind`(UI 渲染 + 字符串解析)、`OutputKind`(Text/Highlight/Svg)、`ToolArgs`(类型强转 helper,消除每工具手写 parse)。`tools()` 返回全部 107 个注册工具,`find_tool()` 按 id 查找供 `run_tool` 分发。
 
 枚举加 strum 派生(`AsRefStr`/`EnumString`/`EnumIter`):`HashAlgo`/`CaseMode`/`ArchiveFormat`/`ImageFormat`。CLI 删 `*Arg` 适配器直接用 core 枚举(clap 经 `EnumString` 解析);GUI 删 `parse_*`,前端传字符串由 `ToolArgs` 转换。
 
-GUI 经 `list_tools` 命令拉取元数据列表动态渲染参数表单,`run_tool(id, input, args)` 通用分发——新增文本工具只追加一个 `impl Tool`,无需改前端或加命令。`ToolError` 扩展至 12 变体(原 Utf8/Base64/Json/Io/EmptyInput/InvalidInput/Parse/Other + 新增 Yaml/Toml/Csv/Regex)。`PasswordOpts::default()`(upper/lower/digits=true, symbols=false)下沉 core,CLI/GUI 共用。
+GUI 经 `list_tools` 命令拉取元数据列表动态渲染参数表单,`run_tool(id, input, args)` 通用分发——新增文本工具只追加一个 `impl Tool`,无需改前端或加命令。`ToolError` 共 12 变体(Utf8/Base64/Json/Io/Yaml/Toml/Csv/Regex/EmptyInput/InvalidInput/Parse/Other)。`PasswordOpts::default()`(upper/lower/digits=true, symbols=false)下沉 core,CLI/GUI 共用。
 
 ## 三类分发(便携度递减)
 
@@ -150,11 +150,11 @@ npm run check                         # svelte-check
 ## 避坑
 
 1. **不手写 crypto**:PBKDF2/AES-GCM/RSA/Argon2/HMAC/Hash 全用成熟 crate。
-2. **commands.rs 13 个命令**:10 文件命令(archive 4 + image 2 + pdf 4,签名各异独立注册)+ 3 通用命令(list_tools/run_tool/list_file_tools),文本工具经 `run_tool` 通用分发不再逐个注册。
-3. **Capabilities 最小权限**:仅 `core:default` + `windows: ["main"]`,CSP 锁紧(`script-src 'self'`)。
+2. **commands.rs 36 个命令**:32 文件命令(通用转换 1 + archive 4 + image 7 + pdf 12 + font 2 + svg 1 + xlsx 2 + 提取 1 + 引擎 2,签名各异独立注册)+ 4 通用命令(list_tools/run_tool/list_file_tools/list_engines),文本工具经 `run_tool` 通用分发不再逐个注册。
+3. **Capabilities 最小权限**:仅 `core:default` + `dialog:default` + `windows: ["main"]`,CSP 锁紧(`script-src 'self'`)。
 4. **Windows WebView2**:`skip` + 文档说明;不嵌 runtime。
 5. **体积优化**:release profile `lto`/`opt-level="z"`/`codegen-units=1`/`panic="abort"`/`strip`;前端 Svelte。
-6. **fileconv feature gate**:core 的 `archive` feature(默认开)条件依赖 `zip`/`tar`/`flate2`;`fs_util` 同 gate(依赖 archive 函数)。`--no-default-features` 可禁用归档独立使用。
+6. **fileconv feature gate**:core 默认启用 6 feature(`archive`/`image`/`pdf`/`font`/`svg`/`xlsx`)。`archive` 条件依赖 `zip`/`tar`/`flate2`/`sevenz-rust2`/`bzip2`/`xz2`/`zstd`;`font` 依赖 `ttf-parser`/`flate2`;`svg` 依赖 `resvg`(`image`);`xlsx` 依赖 `calamine`/`rust_xlsxwriter`。`--no-default-features` 可禁用各域独立使用。
 7. **GUI 文件转换**:command 接收路径,后端 `std::fs` 读写(Rust 后端不受 capabilities 约束),仅 `tauri-plugin-dialog` 取路径,无需 fs 插件,capabilities 仅加 `dialog:default` 保持最小权限。
 8. **产物碰撞**:`OpenOptions::create_new(true)` 原子检查无 TOCTOU 竞态,迭代 `_converted`→`(1)`→`(2)` 后缀,不静默覆盖。
 
@@ -170,4 +170,4 @@ npm run check                         # svelte-check
 | OpenCovibe | `reference/competitors/OpenCovibe/` | 集中式 API/Builder 链 |
 | comine | `reference/competitors/comine/` | capabilities scope/ts-rs |
 
-`UNVERIFIED:` DevToys 接口确切路径未逐一核实;各竞品实际产物体积未编译测量。
+`以下未核实:` DevToys 接口确切路径未逐一核实;各竞品实际产物体积未编译测量。

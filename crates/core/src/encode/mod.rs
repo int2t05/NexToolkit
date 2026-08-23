@@ -141,6 +141,536 @@ pub fn jwt_verify(input: &str, key: &str) -> ToolResult<String> {
     Ok(serde_json::to_string_pretty(&payload)?)
 }
 
+// ---------------------------------------------------------------------------
+// Base32(RFC 4648)
+// ---------------------------------------------------------------------------
+
+const BASE32_ALPHABET: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+/// Base32 编码(RFC 4648,标准字母表 A-Z2-7,含 padding)
+pub fn base32_encode(input: &str) -> ToolResult<String> {
+    let bytes = input.as_bytes();
+    let mut out = String::with_capacity(bytes.len().div_ceil(5) * 8);
+
+    for chunk in bytes.chunks(5) {
+        // 将 chunk 补齐到 5 字节(高位在前)
+        let mut buf = [0u8; 5];
+        buf[..chunk.len()].copy_from_slice(chunk);
+
+        // 5 字节 → 40 bit → 8 个 5-bit 组(高位在前)
+        let bits = u64::from_be_bytes({
+            let mut b = [0u8; 8];
+            b[3..8].copy_from_slice(&buf);
+            b
+        });
+        let groups = [
+            ((bits >> 35) & 0x1F) as usize,
+            ((bits >> 30) & 0x1F) as usize,
+            ((bits >> 25) & 0x1F) as usize,
+            ((bits >> 20) & 0x1F) as usize,
+            ((bits >> 15) & 0x1F) as usize,
+            ((bits >> 10) & 0x1F) as usize,
+            ((bits >> 5) & 0x1F) as usize,
+            (bits & 0x1F) as usize,
+        ];
+
+        // 根据输入字节数决定输出字符数与 padding
+        let (chars, pad) = match chunk.len() {
+            1 => (2, 6),
+            2 => (4, 4),
+            3 => (5, 3),
+            4 => (7, 1),
+            _ => (8, 0),
+        };
+        for &g in &groups[..chars] {
+            out.push(BASE32_ALPHABET[g] as char);
+        }
+        out.push_str(&"=".repeat(pad));
+    }
+    Ok(out)
+}
+
+/// Base32 解码(RFC 4648,容忍大小写与首尾空白,padding 可省略)
+pub fn base32_decode(input: &str) -> ToolResult<String> {
+    let stripped: String = input
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+
+    let bytes = stripped.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len() / 8 * 5);
+
+    for chunk in bytes.chunks(8) {
+        let chars = chunk.iter().take_while(|&&c| c != b'=').count();
+        if chars == 0 {
+            continue;
+        }
+        if !(2..=8).contains(&chars) {
+            return Err(ToolError::InvalidInput(format!(
+                "Base32 分组长度无效: {chars}(应为 2-8)"
+            )));
+        }
+
+        // 8 个 5-bit 值 → 40 bit → 5 字节
+        let mut bits: u64 = 0;
+        for &c in &chunk[..chars] {
+            let val = match c {
+                b'A'..=b'Z' => c - b'A',
+                b'2'..=b'7' => c - b'2' + 26,
+                _ => return Err(ToolError::Parse(format!("非法 Base32 字符: {}", c as char))),
+            };
+            bits = (bits << 5) | val as u64;
+        }
+        // 不足 8 字符的分组需要左移补齐到 40 bit
+        bits <<= (8 - chars) * 5;
+
+        let raw = bits.to_be_bytes();
+        // 根据字符数决定输出字节数
+        let out_bytes = match chars {
+            2 => 1,
+            4 => 2,
+            5 => 3,
+            7 => 4,
+            8 => 5,
+            _ => return Err(ToolError::InvalidInput("Base32 分组字符数无效".into())),
+        };
+        out.extend_from_slice(&raw[3..3 + out_bytes]);
+    }
+
+    String::from_utf8(out).map_err(ToolError::from)
+}
+
+// ---------------------------------------------------------------------------
+// Base58(Bitcoin 字母表)
+// ---------------------------------------------------------------------------
+
+/// Base58 编码(Bitcoin 字母表,无前缀/校验)
+pub fn base58_encode(input: &str) -> ToolResult<String> {
+    Ok(bs58::encode(input.as_bytes()).into_string())
+}
+
+/// Base58 解码(Bitcoin 字母表,容忍首尾空白)
+pub fn base58_decode(input: &str) -> ToolResult<String> {
+    let bytes = bs58::decode(input.trim())
+        .into_vec()
+        .map_err(|e| ToolError::Parse(e.to_string()))?;
+    String::from_utf8(bytes).map_err(ToolError::from)
+}
+
+// ---------------------------------------------------------------------------
+// Base85 / Ascii85(Adobe 变体,`!` 起始,`z` 零字节简写,不含 <~ ~> 包裹)
+// ---------------------------------------------------------------------------
+
+const ASCII85_OFFSET: u32 = 33; // '!' = 33
+
+/// Ascii85 编码:4 字节 → 5 字符(85 进制),全零组输出 `z`,尾部按实际字节数截断
+pub fn base85_encode(input: &str) -> ToolResult<String> {
+    let bytes = input.as_bytes();
+    let mut out = String::with_capacity(bytes.len().div_ceil(4) * 5);
+
+    for chunk in bytes.chunks(4) {
+        if chunk.len() == 4 && chunk == [0, 0, 0, 0] {
+            out.push('z');
+            continue;
+        }
+
+        // 补齐到 4 字节(零填充)
+        let mut buf = [0u8; 4];
+        buf[..chunk.len()].copy_from_slice(chunk);
+        let n = u32::from_be_bytes(buf);
+
+        // 5 个 85 进制位(高位在前)
+        let digits = [
+            (n / 85u32.pow(4)) % 85,
+            (n / 85u32.pow(3)) % 85,
+            (n / 85u32.pow(2)) % 85,
+            (n / 85u32.pow(1)) % 85,
+            n % 85,
+        ];
+
+        // 完整组输出 5 字符,尾部组输出 chunk.len()+1 字符
+        let out_chars = if chunk.len() == 4 { 5 } else { chunk.len() + 1 };
+        for &d in &digits[..out_chars] {
+            out.push((ASCII85_OFFSET + d) as u8 as char);
+        }
+    }
+    Ok(out)
+}
+
+/// Ascii85 解码:`z` → 4 零字节,5 字符 → 4 字节,尾部按字符数截断
+pub fn base85_decode(input: &str) -> ToolResult<String> {
+    let bytes: Vec<u8> = input
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| c as u8)
+        .collect();
+
+    // 逐字符处理,按 5 字符分组(或 z 单字符组)
+    let mut out = Vec::new();
+    let mut group: Vec<u8> = Vec::with_capacity(5);
+
+    for &c in &bytes {
+        if c == b'z' && group.is_empty() {
+            out.extend_from_slice(&[0, 0, 0, 0]);
+        } else if c == b'z' {
+            return Err(ToolError::Parse("Ascii85: z 只能出现在完整组边界".into()));
+        } else if (b'!'..=b'u').contains(&c) {
+            group.push(c);
+            if group.len() == 5 {
+                let n = decode_ascii85_group(&group)?;
+                out.extend_from_slice(&n.to_be_bytes());
+                group.clear();
+            }
+        } else {
+            return Err(ToolError::Parse(format!(
+                "非法 Ascii85 字符: {}",
+                c as char
+            )));
+        }
+    }
+
+    // 处理尾部不完整组(2-4 字符)
+    if !group.is_empty() {
+        let chars = group.len();
+        if !(2..=4).contains(&chars) {
+            return Err(ToolError::Parse(format!(
+                "Ascii85 尾部分组字符数无效: {chars}(应为 2-4)"
+            )));
+        }
+        // 补齐到 5 字符(用 'u' = 最大值填充)
+        while group.len() < 5 {
+            group.push(b'u');
+        }
+        let n = decode_ascii85_group(&group)?;
+        // 输出 chars-1 字节
+        let raw = n.to_be_bytes();
+        out.extend_from_slice(&raw[..chars - 1]);
+    }
+
+    String::from_utf8(out).map_err(ToolError::from)
+}
+
+/// 将 5 个 Ascii85 字符解码为 u32
+fn decode_ascii85_group(group: &[u8]) -> ToolResult<u32> {
+    let mut n: u32 = 0;
+    for &c in group {
+        n = n
+            .checked_mul(85)
+            .ok_or_else(|| ToolError::Parse("Ascii85 解码溢出".into()))?;
+        n = n
+            .checked_add((c - ASCII85_OFFSET as u8) as u32)
+            .ok_or_else(|| ToolError::Parse("Ascii85 解码溢出".into()))?;
+    }
+    Ok(n)
+}
+
+// ---------------------------------------------------------------------------
+// Punycode(RFC 3492,域名标签 xn-- 前缀)
+// ---------------------------------------------------------------------------
+
+/// Punycode 编码:Unicode 字符串 → `xn--<punycode>` 域名标签
+pub fn punycode_encode(input: &str) -> ToolResult<String> {
+    let encoded = punycode::encode(input)
+        .map_err(|_| ToolError::InvalidInput("Punycode 编码失败: 输入含无效字符".into()))?;
+    Ok(format!("xn--{encoded}"))
+}
+
+/// Punycode 解码:`xn--<punycode>` 或裸 punycode → Unicode 字符串
+pub fn punycode_decode(input: &str) -> ToolResult<String> {
+    let stripped = input.trim();
+    let bare = stripped
+        .strip_prefix("xn--")
+        .or_else(|| stripped.strip_prefix("XN--"))
+        .unwrap_or(stripped);
+    punycode::decode(bare)
+        .map_err(|_| ToolError::InvalidInput("Punycode 解码失败: 输入格式错误".into()))
+}
+
+// ---------------------------------------------------------------------------
+// Quoted-Printable(RFC 2045)
+// ---------------------------------------------------------------------------
+
+/// Quoted-Printable 编码:将文本编码为 ASCII 安全的 QP 格式
+pub fn quoted_printable_encode(input: &str) -> ToolResult<String> {
+    Ok(quoted_printable::encode_to_str(input.as_bytes()))
+}
+
+/// Quoted-Printable 解码:将 QP 编码文本还原为原始字符串
+pub fn quoted_printable_decode(input: &str) -> ToolResult<String> {
+    let bytes = quoted_printable::decode(input.as_bytes(), quoted_printable::ParseMode::Robust)
+        .map_err(|e| ToolError::Parse(e.to_string()))?;
+    String::from_utf8(bytes).map_err(ToolError::from)
+}
+
+// ---------------------------------------------------------------------------
+// Morse(国际摩斯码,ITU-R M.1677)
+// ---------------------------------------------------------------------------
+
+/// 摩斯码表:A-Z 0-9 → 点划字符串
+const MORSE_TABLE: &[(&str, &str)] = &[
+    ("A", ".-"),
+    ("B", "-..."),
+    ("C", "-.-."),
+    ("D", "-.."),
+    ("E", "."),
+    ("F", "..-."),
+    ("G", "--."),
+    ("H", "...."),
+    ("I", ".."),
+    ("J", ".---"),
+    ("K", "-.-"),
+    ("L", ".-.."),
+    ("M", "--"),
+    ("N", "-."),
+    ("O", "---"),
+    ("P", ".--."),
+    ("Q", "--.-"),
+    ("R", ".-."),
+    ("S", "..."),
+    ("T", "-"),
+    ("U", "..-"),
+    ("V", "...-"),
+    ("W", ".--"),
+    ("X", "-..-"),
+    ("Y", "-.--"),
+    ("Z", "--.."),
+    ("0", "-----"),
+    ("1", ".----"),
+    ("2", "..---"),
+    ("3", "...--"),
+    ("4", "....-"),
+    ("5", "....."),
+    ("6", "-...."),
+    ("7", "--..."),
+    ("8", "---.."),
+    ("9", "----."),
+];
+
+/// Morse 编码:文本 → 摩斯码(字母间空格分隔,单词间 ` / ` 分隔)
+pub fn morse_encode(input: &str) -> ToolResult<String> {
+    let mut words: Vec<String> = Vec::new();
+    for word in input.split_whitespace() {
+        let mut letters: Vec<String> = Vec::new();
+        for ch in word.chars() {
+            let upper = ch.to_ascii_uppercase().to_string();
+            let code = MORSE_TABLE
+                .iter()
+                .find(|(c, _)| *c == upper)
+                .map(|(_, m)| *m)
+                .ok_or_else(|| {
+                    ToolError::InvalidInput(format!("Morse 不支持字符: {ch}(仅 A-Z 0-9)"))
+                })?;
+            letters.push(code.to_string());
+        }
+        words.push(letters.join(" "));
+    }
+    Ok(words.join(" / "))
+}
+
+/// Morse 解码:摩斯码 → 文本(字母间空格,单词间 ` / `)
+pub fn morse_decode(input: &str) -> ToolResult<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Ok(String::new());
+    }
+
+    let mut words: Vec<String> = Vec::new();
+    for word in trimmed.split(" / ") {
+        let mut letters: Vec<String> = Vec::new();
+        for code in word.split_whitespace() {
+            let ch = MORSE_TABLE
+                .iter()
+                .find(|(_, m)| *m == code)
+                .map(|(c, _)| *c)
+                .ok_or_else(|| ToolError::InvalidInput(format!("无效摩斯码: {code}")))?;
+            letters.push(ch.to_string());
+        }
+        words.push(letters.join(""));
+    }
+    Ok(words.join(" "))
+}
+
+// ---------------------------------------------------------------------------
+// Braille(Unicode 盲文,基本拉丁字母 a-z + 空格)
+// ---------------------------------------------------------------------------
+
+/// a-z → 盲文字符位模式(6 点:bit0=dot1 .. bit5=dot6,Unicode U+2800 + pattern)
+const BRAILLE_TABLE: &[(char, u8)] = &[
+    ('a', 0b000001),
+    ('b', 0b000011),
+    ('c', 0b001001),
+    ('d', 0b011001),
+    ('e', 0b010001),
+    ('f', 0b001011),
+    ('g', 0b011011),
+    ('h', 0b010011),
+    ('i', 0b001010),
+    ('j', 0b011010),
+    ('k', 0b000101),
+    ('l', 0b000111),
+    ('m', 0b001101),
+    ('n', 0b011101),
+    ('o', 0b010101),
+    ('p', 0b001111),
+    ('q', 0b011111),
+    ('r', 0b010111),
+    ('s', 0b001110),
+    ('t', 0b011110),
+    ('u', 0b100101),
+    ('v', 0b100111),
+    ('w', 0b111010),
+    ('x', 0b101101),
+    ('y', 0b111101),
+    ('z', 0b110101),
+];
+
+const BRAILLE_BLANK: char = '\u{2800}'; // 空白盲文(无点)
+
+/// Braille 编码:文本 → Unicode 盲文字符(a-z 不区分大小写,空格→空白盲文)
+pub fn braille_encode(input: &str) -> ToolResult<String> {
+    let mut out = String::with_capacity(input.len());
+    for ch in input.chars() {
+        if ch == ' ' {
+            out.push(BRAILLE_BLANK);
+        } else if ch.is_ascii_alphabetic() {
+            let lower = ch.to_ascii_lowercase();
+            let pattern = BRAILLE_TABLE
+                .iter()
+                .find(|(c, _)| *c == lower)
+                .map(|(_, p)| *p)
+                .ok_or_else(|| ToolError::InvalidInput(format!("Braille 不支持字符: {ch}")))?;
+            out.push(char::from_u32(0x2800 + pattern as u32).unwrap());
+        } else {
+            return Err(ToolError::InvalidInput(format!(
+                "Braille 不支持字符: {ch}(仅 a-z 与空格)"
+            )));
+        }
+    }
+    Ok(out)
+}
+
+/// Braille 解码:Unicode 盲文字符 → 文本
+pub fn braille_decode(input: &str) -> ToolResult<String> {
+    let mut out = String::with_capacity(input.len());
+    for ch in input.chars() {
+        if ch == BRAILLE_BLANK {
+            out.push(' ');
+        } else if ('\u{2801}'..='\u{283F}').contains(&ch) {
+            let pattern = (ch as u32 - 0x2800) as u8;
+            let letter = BRAILLE_TABLE
+                .iter()
+                .find(|(_, p)| *p == pattern)
+                .map(|(c, _)| *c)
+                .ok_or_else(|| {
+                    ToolError::InvalidInput(format!("无盲文映射: U+{:04X}", ch as u32))
+                })?;
+            out.push(letter);
+        } else if ch.is_whitespace() {
+            // 容忍普通空白(视为盲文空白)
+            out.push(' ');
+        } else {
+            return Err(ToolError::InvalidInput(format!(
+                "非盲文字符: U+{:04X}",
+                ch as u32
+            )));
+        }
+    }
+    Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// 零宽字符隐写(U+200B=0, U+200C=1;文本 ↔ 零宽字符序列)
+// ---------------------------------------------------------------------------
+
+const ZW_ZERO: char = '\u{200B}'; // ZERO WIDTH SPACE → bit 0
+const ZW_ONE: char = '\u{200C}'; // ZERO WIDTH NON-JOINER → bit 1
+
+/// 零宽字符隐写编码:文本 → UTF-8 字节二进制 → 零宽字符序列(每字节 8 个零宽字符)
+pub fn zero_width_encode(input: &str) -> ToolResult<String> {
+    let mut out = String::with_capacity(input.len() * 8);
+    for byte in input.as_bytes() {
+        for i in (0..8).rev() {
+            out.push(if (byte >> i) & 1 == 1 {
+                ZW_ONE
+            } else {
+                ZW_ZERO
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// 零宽字符隐写解码:零宽字符序列 → 二进制 → UTF-8 字节 → 文本
+pub fn zero_width_decode(input: &str) -> ToolResult<String> {
+    let bits: Vec<u8> = input
+        .chars()
+        .filter(|c| *c == ZW_ZERO || *c == ZW_ONE)
+        .map(|c| if c == ZW_ONE { 1 } else { 0 })
+        .collect();
+
+    if bits.is_empty() {
+        return Ok(String::new());
+    }
+    if !bits.len().is_multiple_of(8) {
+        return Err(ToolError::InvalidInput(format!(
+            "零宽字符数非 8 的倍数: {}(可能是截断或非隐写数据)",
+            bits.len()
+        )));
+    }
+
+    let bytes: Vec<u8> = bits
+        .chunks(8)
+        .map(|chunk| chunk.iter().fold(0u8, |acc, &bit| (acc << 1) | bit))
+        .collect();
+
+    String::from_utf8(bytes).map_err(ToolError::from)
+}
+
+// ---- 字符编码转换(charset:UTF-8/GBK/Big5/Shift_JIS 等)----
+
+/// 支持的字符编码列表
+pub const CHARSET_OPTIONS: &[&str] = &[
+    "utf-8",
+    "gbk",
+    "gb2312",
+    "gb18030",
+    "big5",
+    "shift_jis",
+    "euc-jp",
+    "euc-kr",
+    "iso-8859-1",
+    "windows-1252",
+];
+
+/// 字符串按 charset 编码为字节,返回 hex 字符串(便于展示与传输)
+pub fn charset_encode(input: &str, charset: &str) -> ToolResult<String> {
+    let encoding = encoding_rs::Encoding::for_label(charset.as_bytes())
+        .ok_or_else(|| ToolError::InvalidInput(format!("不支持的字符编码: {charset}")))?;
+    let (bytes, _, _) = encoding.encode(input);
+    Ok(bytes.iter().map(|b| format!("{b:02X}")).collect())
+}
+
+/// hex 字符串按 charset 解码为字符串
+pub fn charset_decode(input: &str, charset: &str) -> ToolResult<String> {
+    let hex: Vec<u8> = input
+        .split_whitespace()
+        .flat_map(|chunk| {
+            chunk
+                .as_bytes()
+                .chunks(2)
+                .filter(|c| c.len() == 2)
+                .map(|c| u8::from_str_radix(std::str::from_utf8(c).unwrap_or(""), 16))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Result<_, _>>()
+        .map_err(|e| ToolError::Parse(format!("hex 解析失败: {e}")))?;
+    let encoding = encoding_rs::Encoding::for_label(charset.as_bytes())
+        .ok_or_else(|| ToolError::InvalidInput(format!("不支持的字符编码: {charset}")))?;
+    let (cow, _, _) = encoding.decode(&hex);
+    Ok(cow.into_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -445,5 +975,318 @@ mod tests {
         let s = keygen.find(begin).expect("含私钥块");
         let e = keygen.find(end).expect("含私钥结束") + end.len();
         keygen[s..e].to_string()
+    }
+
+    // ---- Base32 ----
+
+    #[test]
+    fn base32_rfc4648_vectors() {
+        assert_eq!(base32_encode("").unwrap(), "");
+        assert_eq!(base32_encode("f").unwrap(), "MY======");
+        assert_eq!(base32_encode("fo").unwrap(), "MZXQ====");
+        assert_eq!(base32_encode("foo").unwrap(), "MZXW6===");
+        assert_eq!(base32_encode("foob").unwrap(), "MZXW6YQ=");
+        assert_eq!(base32_encode("fooba").unwrap(), "MZXW6YTB");
+        assert_eq!(base32_encode("foobar").unwrap(), "MZXW6YTBOI======");
+    }
+
+    #[test]
+    fn base32_decode_vectors() {
+        assert_eq!(base32_decode("MY======").unwrap(), "f");
+        assert_eq!(base32_decode("MZXQ====").unwrap(), "fo");
+        assert_eq!(base32_decode("MZXW6===").unwrap(), "foo");
+        assert_eq!(base32_decode("MZXW6YQ=").unwrap(), "foob");
+        assert_eq!(base32_decode("MZXW6YTB").unwrap(), "fooba");
+        assert_eq!(base32_decode("MZXW6YTBOI======").unwrap(), "foobar");
+    }
+
+    #[test]
+    fn base32_decode_lowercase_and_no_padding() {
+        assert_eq!(base32_decode("my======").unwrap(), "f");
+        assert_eq!(base32_decode("MY").unwrap(), "f");
+        assert_eq!(base32_decode("MZXW6YTB").unwrap(), "fooba");
+    }
+
+    #[test]
+    fn base32_roundtrip() {
+        for s in [
+            "",
+            "f",
+            "fo",
+            "foo",
+            "foob",
+            "fooba",
+            "foobar",
+            "Hello",
+            "中文测试",
+        ] {
+            assert_eq!(base32_decode(&base32_encode(s).unwrap()).unwrap(), s);
+        }
+    }
+
+    #[test]
+    fn base32_decode_invalid() {
+        assert!(base32_decode("!!!").is_err());
+        assert!(base32_decode("M").is_err());
+    }
+
+    // ---- Base58 ----
+
+    #[test]
+    fn base58_empty() {
+        assert_eq!(base58_encode("").unwrap(), "");
+        assert_eq!(base58_decode("").unwrap(), "");
+    }
+
+    #[test]
+    fn base58_roundtrip() {
+        for s in ["", "Hello", "Hello World", "中文测试", "1234567890"] {
+            assert_eq!(base58_decode(&base58_encode(s).unwrap()).unwrap(), s);
+        }
+    }
+
+    #[test]
+    fn base58_decode_invalid() {
+        // 0/O/I/l 不在 Bitcoin 字母表
+        assert!(base58_decode("0OIl").is_err());
+    }
+
+    // ---- Base85 / Ascii85 ----
+
+    #[test]
+    fn base85_known_vectors() {
+        assert_eq!(base85_encode("Man ").unwrap(), "9jqo^");
+        assert_eq!(base85_encode("Man").unwrap(), "9jqo");
+        assert_eq!(base85_encode("").unwrap(), "");
+        assert_eq!(base85_encode("\u{0}\u{0}\u{0}\u{0}").unwrap(), "z");
+    }
+
+    #[test]
+    fn base85_decode_known_vectors() {
+        assert_eq!(base85_decode("9jqo^").unwrap(), "Man ");
+        assert_eq!(base85_decode("9jqo").unwrap(), "Man");
+        assert_eq!(base85_decode("z").unwrap(), "\u{0}\u{0}\u{0}\u{0}");
+    }
+
+    #[test]
+    fn base85_roundtrip() {
+        for s in [
+            "",
+            "Man",
+            "Man ",
+            "Hello, World!",
+            "中文",
+            "\u{0}\u{0}\u{0}\u{0}AB",
+        ] {
+            assert_eq!(base85_decode(&base85_encode(s).unwrap()).unwrap(), s);
+        }
+    }
+
+    #[test]
+    fn base85_decode_invalid() {
+        assert!(base85_decode("{").is_err());
+    }
+
+    // ---- Punycode ----
+
+    #[test]
+    fn punycode_rfc3492_vectors() {
+        assert_eq!(punycode_encode("bücher").unwrap(), "xn--bcher-kva");
+        assert_eq!(punycode_decode("xn--bcher-kva").unwrap(), "bücher");
+        assert_eq!(punycode_encode("münchen").unwrap(), "xn--mnchen-3ya");
+        assert_eq!(punycode_decode("xn--mnchen-3ya").unwrap(), "münchen");
+    }
+
+    #[test]
+    fn punycode_decode_without_prefix() {
+        assert_eq!(punycode_decode("bcher-kva").unwrap(), "bücher");
+    }
+
+    #[test]
+    fn punycode_roundtrip() {
+        for s in ["bücher", "münchen", "例え", "中文", "café"] {
+            assert_eq!(punycode_decode(&punycode_encode(s).unwrap()).unwrap(), s);
+        }
+    }
+
+    // ---- Quoted-Printable ----
+
+    #[test]
+    fn qp_encode_basic() {
+        assert_eq!(quoted_printable_encode("Hello").unwrap(), "Hello");
+        assert_eq!(quoted_printable_encode("a=b").unwrap(), "a=3Db");
+    }
+
+    #[test]
+    fn qp_encode_unicode() {
+        // é = U+00E9 = UTF-8 C3 A9
+        assert_eq!(quoted_printable_encode("café").unwrap(), "caf=C3=A9");
+    }
+
+    #[test]
+    fn qp_decode_basic() {
+        assert_eq!(quoted_printable_decode("Hello").unwrap(), "Hello");
+        assert_eq!(quoted_printable_decode("a=3Db").unwrap(), "a=b");
+    }
+
+    #[test]
+    fn qp_roundtrip() {
+        for s in ["Hello", "a=b", "café", "中文测试", "Hello World!"] {
+            assert_eq!(
+                quoted_printable_decode(&quoted_printable_encode(s).unwrap()).unwrap(),
+                s
+            );
+        }
+    }
+
+    // ---- Morse ----
+
+    #[test]
+    fn morse_encode_basic() {
+        assert_eq!(morse_encode("SOS").unwrap(), "... --- ...");
+        assert_eq!(morse_encode("HELLO").unwrap(), ".... . .-.. .-.. ---");
+        assert_eq!(
+            morse_encode("HELLO WORLD").unwrap(),
+            ".... . .-.. .-.. --- / .-- --- .-. .-.. -.."
+        );
+    }
+
+    #[test]
+    fn morse_encode_lowercase() {
+        assert_eq!(morse_encode("hello").unwrap(), ".... . .-.. .-.. ---");
+    }
+
+    #[test]
+    fn morse_encode_numbers() {
+        assert_eq!(morse_encode("123").unwrap(), ".---- ..--- ...--");
+    }
+
+    #[test]
+    fn morse_decode_basic() {
+        assert_eq!(morse_decode("... --- ...").unwrap(), "SOS");
+        assert_eq!(morse_decode(".... . .-.. .-.. ---").unwrap(), "HELLO");
+        assert_eq!(
+            morse_decode(".... . .-.. .-.. --- / .-- --- .-. .-.. -..").unwrap(),
+            "HELLO WORLD"
+        );
+    }
+
+    #[test]
+    fn morse_roundtrip() {
+        for s in ["SOS", "HELLO WORLD", "ABC 123 XYZ"] {
+            assert_eq!(morse_decode(&morse_encode(s).unwrap()).unwrap(), s);
+        }
+    }
+
+    #[test]
+    fn morse_encode_invalid() {
+        assert!(morse_encode("你好").is_err());
+    }
+
+    // ---- Braille ----
+
+    #[test]
+    fn braille_encode_basic() {
+        // h=U+2813, e=U+2811, l=U+2807, o=U+2815
+        assert_eq!(
+            braille_encode("hello").unwrap(),
+            "\u{2813}\u{2811}\u{2807}\u{2807}\u{2815}"
+        );
+        assert_eq!(braille_encode("abc").unwrap(), "\u{2801}\u{2803}\u{2809}");
+    }
+
+    #[test]
+    fn braille_encode_uppercase() {
+        assert_eq!(braille_encode("ABC").unwrap(), "\u{2801}\u{2803}\u{2809}");
+    }
+
+    #[test]
+    fn braille_encode_space() {
+        // a=U+2801, 空格=U+2800, b=U+2803
+        assert_eq!(braille_encode("a b").unwrap(), "\u{2801}\u{2800}\u{2803}");
+    }
+
+    #[test]
+    fn braille_decode_basic() {
+        assert_eq!(
+            braille_decode("\u{2813}\u{2811}\u{2807}\u{2807}\u{2815}").unwrap(),
+            "hello"
+        );
+        assert_eq!(braille_decode("\u{2801}\u{2803}\u{2809}").unwrap(), "abc");
+    }
+
+    #[test]
+    fn braille_roundtrip() {
+        for s in ["hello", "abc", "a b", "abcdefghijklmnopqrstuvwxyz"] {
+            assert_eq!(braille_decode(&braille_encode(s).unwrap()).unwrap(), s);
+        }
+    }
+
+    #[test]
+    fn braille_encode_invalid() {
+        assert!(braille_encode("123").is_err());
+    }
+
+    // ---- 零宽字符隐写 ----
+
+    #[test]
+    fn zero_width_encode_basic() {
+        // "Hi" = 2 字节 → 16 个零宽字符
+        let encoded = zero_width_encode("Hi").unwrap();
+        let zw_count = encoded
+            .chars()
+            .filter(|c| *c == '\u{200B}' || *c == '\u{200C}')
+            .count();
+        assert_eq!(zw_count, 16);
+    }
+
+    #[test]
+    fn zero_width_empty() {
+        assert_eq!(zero_width_encode("").unwrap(), "");
+        assert_eq!(zero_width_decode("").unwrap(), "");
+    }
+
+    #[test]
+    fn zero_width_roundtrip() {
+        for s in ["", "Hi", "Hello World", "中文测试", "\u{1F600}"] {
+            assert_eq!(
+                zero_width_decode(&zero_width_encode(s).unwrap()).unwrap(),
+                s
+            );
+        }
+    }
+
+    #[test]
+    fn zero_width_decode_no_data() {
+        // 无零宽字符 → 返回空
+        assert_eq!(zero_width_decode("hello").unwrap(), "");
+    }
+
+    #[test]
+    fn zero_width_decode_invalid() {
+        // 零宽字符数非 8 的倍数
+        assert!(zero_width_decode("\u{200B}").is_err());
+    }
+
+    #[test]
+    fn charset_encode_gbk() {
+        // "中文" GBK 编码 = D6 D0 CE C4
+        assert_eq!(charset_encode("中文", "gbk").unwrap(), "D6D0CEC4");
+    }
+
+    #[test]
+    fn charset_decode_gbk() {
+        assert_eq!(charset_decode("D6D0 CEC4", "gbk").unwrap(), "中文");
+    }
+
+    #[test]
+    fn charset_roundtrip_utf8() {
+        let hex = charset_encode("Hello 中文", "utf-8").unwrap();
+        assert_eq!(charset_decode(&hex, "utf-8").unwrap(), "Hello 中文");
+    }
+
+    #[test]
+    fn charset_unsupported() {
+        assert!(charset_encode("test", "xxx").is_err());
     }
 }

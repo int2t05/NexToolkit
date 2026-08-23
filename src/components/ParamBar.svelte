@@ -1,19 +1,19 @@
 <script lang="ts">
   import { appState } from '../lib/state.svelte';
   import { joinFileNames } from '../lib/format';
-  import { FolderOpen } from '@lucide/svelte';
+  import { FolderOpen, Folder } from '@lucide/svelte';
   import type { ToolMetaDto } from '../lib/types';
 
   let { tool }: { tool: ToolMetaDto } = $props();
 </script>
 
 {#if tool.params.length > 0}
-  <div class="params">
+  <div class="param-bar">
     {#each tool.params as p (p.key)}
       <label class="param">
         <span class="param-label">{p.label}</span>
         {#if p.kind === 'textarea'}
-          <textarea rows="3" bind:value={appState.params[p.key]} placeholder={p.placeholder ?? ''}></textarea>
+          <textarea rows="2" bind:value={appState.params[p.key]} placeholder={p.placeholder ?? ''}></textarea>
         {:else if p.kind === 'select'}
           <select bind:value={appState.params[p.key]}>
             {#each p.options as opt}
@@ -21,10 +21,16 @@
             {/each}
           </select>
         {:else if p.kind === 'file'}
-          <button class="file-pick" onclick={() => appState.pickFile(p.key, p.multiple)}>
-            <FolderOpen size={14} />
-            {appState.t('选择文件', 'Choose file')}{p.multiple ? ` (${appState.t('多选', 'multi')})` : ''}
-          </button>
+          <div class="file-row">
+            <button class="file-pick" onclick={() => appState.pickFile(p.key, p.multiple, false)}>
+              <FolderOpen size={14} />
+              {appState.t('选文件', 'Files')}{p.multiple ? ` (${appState.t('多', 'multi')})` : ''}
+            </button>
+            <button class="file-pick" onclick={() => appState.pickFile(p.key, true, true)} title={appState.t('选文件夹', 'Pick folder')}>
+              <Folder size={14} />
+              {appState.t('文件夹', 'Folder')}
+            </button>
+          </div>
           {#if joinFileNames(appState.files[p.key] ?? [])}
             <span class="file-name">{joinFileNames(appState.files[p.key] ?? [])}</span>
           {/if}
@@ -41,11 +47,11 @@
 {/if}
 
 <style>
-  .params {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  .param-bar {
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--ntx-space-3);
-    margin-bottom: var(--ntx-space-3);
+    align-items: flex-end;
   }
   .param {
     display: flex;
@@ -53,8 +59,8 @@
     gap: var(--ntx-space-1);
   }
   .param-label {
-    font-size: 12px;
-    color: var(--ntx-fg-muted);
+    font-size: 11px;
+    color: var(--ntx-fg-subtle);
   }
   .param input,
   .param select,
@@ -62,17 +68,20 @@
     background: var(--ntx-bg);
     border: 1px solid var(--ntx-border);
     color: var(--ntx-fg);
-    padding: var(--ntx-space-2);
+    padding: var(--ntx-space-1) var(--ntx-space-2);
     border-radius: var(--ntx-radius-sm);
     font-size: 13px;
     font-family: inherit;
-    transition: border-color var(--ntx-transition);
+    min-width: 120px;
   }
   .param input:focus-visible,
   .param select:focus-visible,
   .param textarea:focus-visible {
     border-color: var(--ntx-primary);
-    outline: none;
+  }
+  .file-row {
+    display: flex;
+    gap: var(--ntx-space-1);
   }
   .file-pick {
     display: inline-flex;
@@ -81,7 +90,7 @@
     background: var(--ntx-surface-3);
     border: 1px solid var(--ntx-border);
     color: var(--ntx-fg);
-    padding: var(--ntx-space-2) var(--ntx-space-3);
+    padding: var(--ntx-space-1) var(--ntx-space-2);
     border-radius: var(--ntx-radius-sm);
     cursor: pointer;
     font-size: 13px;
@@ -91,7 +100,7 @@
   }
   .file-name {
     color: var(--ntx-success);
-    font-size: 12px;
+    font-size: 11px;
     word-break: break-all;
   }
 </style>
