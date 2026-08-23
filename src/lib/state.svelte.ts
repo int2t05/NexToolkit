@@ -5,13 +5,15 @@
 import { invoke } from '../bindings';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import hljs from 'highlight.js';
-import type { ToolMetaDto, EngineStatusDto } from './types';
-import { SUBGROUPS, SUBCATEGORY, BIDIRECTIONAL, MULTI_OUTPUT_SUBGROUPS } from './types';
+import type { ToolMetaDto, EngineStatusDto, EngineInstallInfoDto } from './types';
+import { SUBGROUPS, SUBCATEGORY, BIDIRECTIONAL, MULTI_OUTPUT_SUBGROUPS, GROUPS } from './types';
 import { escapeHtml } from './format';
 
 const FAV_KEY = 'nextoolkit-favorites';
 const RECENT_KEY = 'nextoolkit-recent';
 const COLLAPSED_KEY = 'nextoolkit-collapsed-groups';
+const EXPANDED_SUBGROUPS_KEY = 'nextoolkit-expanded-subgroups';
+const THEME_KEY = 'nextoolkit-theme';
 const RECENT_MAX = 5;
 
 function loadFavorites(): Set<string> {
@@ -41,6 +43,23 @@ function loadCollapsed(): Set<string> {
   }
 }
 
+function loadExpandedSubgroups(): Set<string> {
+  try {
+    const raw = localStorage.getItem(EXPANDED_SUBGROUPS_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function loadTheme(): 'light' | 'dark' | 'auto' {
+  try {
+    const raw = localStorage.getItem(THEME_KEY);
+    if (raw === 'light' || raw === 'dark' || raw === 'auto') return raw;
+  } catch {}
+  return 'auto';
+}
+
 class AppState {
   // ── 基础 ──────────────────────────────────────────
   tools = $state<ToolMetaDto[]>([]);
@@ -48,6 +67,7 @@ class AppState {
   selectedTool = $state<ToolMetaDto | null>(null);
   lang = $state<'zh' | 'en'>('zh');
   query = $state('');
+  theme = $state<'light' | 'dark' | 'auto'>(loadTheme());
 
   // ── 输入/输出 ─────────────────────────────────────
   mainInput = $state('');
@@ -62,13 +82,19 @@ class AppState {
   paletteOpen = $state(false);
   paletteQuery = $state('');
 
+  // ── 视图切换(工具 / 引擎管理)──────────────────────
+  selectedView = $state<'tools' | 'engines'>('tools');
+
   // ── 侧栏持久状态 ─────────────────────────────────
   favorites = $state<Set<string>>(loadFavorites());
   recent = $state<string[]>(loadRecent());
   collapsedGroups = $state<Set<string>>(loadCollapsed());
+  expandedSubgroups = $state<Set<string>>(loadExpandedSubgroups());
 
   // ── 引擎状态(运行时探测)──────────────────────────
   engines = $state<EngineStatusDto[]>([]);
+  engineInstallInfos = $state<EngineInstallInfoDto[]>([]);
+  installingEngine = $state<string | null>(null);
 
   // ── 工作区(子分类 + tab 切工具 + 模式)──────────────
   selectedSubgroup = $state<string | null>(null);
@@ -160,19 +186,38 @@ class AppState {
     }
   }
 
-  /** 探测引擎可用性(失败静默,引擎状态非关键路径) */
+  /** 探测引擎可用性 + 安装信息(失败静默,引擎状态非关键路径) */
   async loadEngines() {
     try {
-      this.engines = await invoke<EngineStatusDto[]>('list_engines');
+      const [statuses, infos] = await Promise.all([
+        invoke<EngineStatusDto[]>('list_engines'),
+        invoke<EngineInstallInfoDto[]>('engine_install_infos'),
+      ]);
+      this.engines = statuses;
+      this.engineInstallInfos = infos;
     } catch {
       this.engines = [];
+      this.engineInstallInfos = [];
+    }
+  }
+
+  /** 安装便携版引擎(ffmpeg/pandoc),完成后刷新状态 */
+  async installEngine(engine: string) {
+    this.installingEngine = engine;
+    try {
+      await invoke<string>('install_engine', { engine });
+      await this.loadEngines();
+    } finally {
+      this.installingEngine = null;
     }
   }
 
   // ── 工具选择 ──────────────────────────────────────
-  /** 纯选择:设当前工具 + 初始化参数默认值 + 清空输出(mainInput 保留,共享输入区) */
+  /** 纯选择:设当前工具 + 设 subgroup + 初始化参数默认值 + 清空输出(mainInput 保留) */
   selectTool(tool: ToolMetaDto) {
     this.selectedTool = tool;
+    const sg = this.subgroupOf(tool);
+    if (sg) this.selectedSubgroup = sg;
     const defaults: Record<string, string> = {};
     for (const p of tool.params) defaults[p.key] = p.default ?? '';
     this.params = defaults;
@@ -185,16 +230,62 @@ class AppState {
     if (!this.mainInput && EXAMPLES[tool.id]) this.mainInput = EXAMPLES[tool.id];
   }
 
-  /** 选中子分类:设 selectedSubgroup + 选首个工具 + 设 mode */
-  selectSubgroup(subgroupId: string) {
-    this.selectedSubgroup = subgroupId;
-    const tools = this.toolsInSubgroup(subgroupId);
-    if (tools.length > 0) {
-      this.selectTool(tools[0]);
-      // 双向工具默认 encode 模式
-      this.mode = tools[0].id in BIDIRECTIONAL ? 'encode' : 'encode';
+  /** Toggle subgroup 展开/折叠(左侧树 header 点击) */
+  toggleSubgroup(id: string) {
+    const next = new Set(this.expandedSubgroups);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    this.expandedSubgroups = next;
+    localStorage.setItem(EXPANDED_SUBGROUPS_KEY, JSON.stringify([...this.expandedSubgroups]));
+  }
+
+  /** 展开 subgroup(选中工具时自动展开,不折叠) */
+  expandSubgroup(id: string) {
+    if (this.expandedSubgroups.has(id)) return;
+    const next = new Set(this.expandedSubgroups);
+    next.add(id);
+    this.expandedSubgroups = next;
+    localStorage.setItem(EXPANDED_SUBGROUPS_KEY, JSON.stringify([...this.expandedSubgroups]));
+  }
+
+  /** Subgroup 是否展开(搜索时强制展开有匹配的;当前选中工具的 subgroup 始终保持展开) */
+  isSubgroupExpanded(id: string, hasMatchingTools: boolean): boolean {
+    if (this.query.trim() && hasMatchingTools) return true;
+    if (this.selectedSubgroup === id) return true;
+    return this.expandedSubgroups.has(id);
+  }
+
+  /** 展开全部 subgroup + group */
+  expandAllSubgroups() {
+    const all = new Set(SUBGROUPS.map((s) => s.id));
+    this.expandedSubgroups = all;
+    this.collapsedGroups = new Set();
+    localStorage.setItem(EXPANDED_SUBGROUPS_KEY, JSON.stringify([...all]));
+    localStorage.setItem(COLLAPSED_KEY, '[]');
+  }
+
+  /** 收起全部 subgroup + group(保留当前选中工具的 group 展开) */
+  collapseAllSubgroups() {
+    this.expandedSubgroups = new Set();
+    const currentGroup = this.selectedTool?.group;
+    const collapsed = new Set(GROUPS.filter((g) => g !== currentGroup));
+    this.collapsedGroups = collapsed;
+    localStorage.setItem(EXPANDED_SUBGROUPS_KEY, '[]');
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
+  }
+
+  /** 全部展开?(toggle 按钮状态判定) */
+  allSubgroupsExpanded = $derived.by(() => {
+    return SUBGROUPS.every((s) => this.expandedSubgroups.has(s.id));
+  });
+
+  /** 统一 toggle:全展开时收起,否则展开全部 */
+  toggleAllSubgroups() {
+    if (this.allSubgroupsExpanded) {
+      this.collapseAllSubgroups();
+    } else {
+      this.expandAllSubgroups();
     }
-    this.paletteOpen = false;
   }
 
   /** tab 切工具(同 subgroup 内):保留 mainInput,切 selectedTool */
@@ -235,7 +326,7 @@ class AppState {
     this.multiOutputs = {};
   }
 
-  /** 用户点击打开:选择 + 计入最近(侧栏/面板点击用)。
+  /** 用户点击打开:选择 + 计入最近 + 自动展开所属 subgroup。
    *  点已选中工具不清空输出/参数(只关闭命令面板),避免误操作丢失结果。 */
   openTool(tool: ToolMetaDto) {
     if (this.selectedTool?.id === tool.id) {
@@ -244,6 +335,8 @@ class AppState {
     }
     this.selectTool(tool);
     this.addRecent(tool.id);
+    const sg = this.subgroupOf(tool);
+    if (sg) this.expandSubgroup(sg);
   }
 
   // ── 收藏 ──────────────────────────────────────────
@@ -282,8 +375,8 @@ class AppState {
   }
 
   // ── 文件选择 ──────────────────────────────────────
-  async pickFile(key: string, multiple: boolean) {
-    const sel = await openDialog({ multiple });
+  async pickFile(key: string, multiple: boolean, directory = false) {
+    const sel = await openDialog({ multiple, directory });
     this.files = { ...this.files, [key]: sel ? (Array.isArray(sel) ? sel : [sel]) : [] };
   }
 
@@ -368,6 +461,10 @@ class AppState {
     this.paletteQuery = '';
   }
 
+  toggleEngineManager() {
+    this.selectedView = this.selectedView === 'engines' ? 'tools' : 'engines';
+  }
+
   // ── i18n ──────────────────────────────────────────
   t(zh: string, en: string): string {
     return this.lang === 'zh' ? zh : en;
@@ -375,6 +472,21 @@ class AppState {
 
   toggleLang() {
     this.lang = this.lang === 'zh' ? 'en' : 'zh';
+  }
+
+  // ── 主题 ──────────────────────────────────────────
+  applyTheme() {
+    if (typeof document !== 'undefined') {
+      document.documentElement.dataset.theme = this.theme;
+    }
+  }
+
+  toggleTheme() {
+    const order: Array<'light' | 'dark' | 'auto'> = ['auto', 'light', 'dark'];
+    const idx = order.indexOf(this.theme);
+    this.theme = order[(idx + 1) % order.length];
+    localStorage.setItem(THEME_KEY, this.theme);
+    this.applyTheme();
   }
 }
 

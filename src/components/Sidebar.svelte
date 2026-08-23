@@ -2,7 +2,13 @@
   import { appState } from '../lib/state.svelte';
   import { GROUPS, GROUP_LABEL, GROUP_CAT_VAR, SUBGROUPS } from '../lib/types';
   import type { SubCategory } from '../lib/types';
-  import { Search, ChevronDown, ChevronRight, Star, Clock, X } from '@lucide/svelte';
+  import { Search, ChevronDown, ChevronRight, Star, Clock, X, ChevronsDownUp, ChevronsUpDown, Braces, ArrowRightLeft, AlignLeft, Sparkles, Type, Shield, Globe, Network, FileBox } from '@lucide/svelte';
+  import type { Component } from 'svelte';
+  import { GROUP_ICON } from '../lib/types';
+
+  const ICON_MAP: Record<string, Component> = {
+    Braces, ArrowRightLeft, AlignLeft, Sparkles, Type, Shield, Globe, Network, FileBox, Clock,
+  };
 
   function clearQuery() {
     appState.query = '';
@@ -28,6 +34,13 @@
         <X size={14} />
       </button>
     {/if}
+    <button
+      class="expand-btn"
+      onclick={() => appState.toggleAllSubgroups()}
+      title={appState.allSubgroupsExpanded ? appState.t('收起全部', 'Collapse all') : appState.t('展开全部', 'Expand all')}
+    >
+      {#if appState.allSubgroupsExpanded}<ChevronsDownUp size={14} />{:else}<ChevronsUpDown size={14} />{/if}
+    </button>
   </div>
 
   <div class="tree">
@@ -68,7 +81,12 @@
       {#if toolsInGroup.length > 0}
         {@const expanded = appState.isGroupExpanded(g, toolsInGroup)}
         <button class="group-header" onclick={() => appState.toggleGroup(g)}>
-          <span class="cat-dot" style={`background: var(${GROUP_CAT_VAR[g]})`}></span>
+          {#if ICON_MAP[GROUP_ICON[g]]}
+            {@const IconComp = ICON_MAP[GROUP_ICON[g]]}
+            <span class="group-icon" style={`color: var(${GROUP_CAT_VAR[g]})`}>
+              <IconComp size={14} />
+            </span>
+          {/if}
           <span class="group-label">{appState.lang === 'zh' ? GROUP_LABEL[g].zh : GROUP_LABEL[g].en}</span>
           <span class="group-count">{toolsInGroup.length}</span>
           <span class="chevron">
@@ -81,14 +99,29 @@
             {#each subs as sub (sub.id)}
               {@const subTools = toolsInGroup.filter((t) => appState.subgroupOf(t) === sub.id)}
               {#if subTools.length > 0}
+                {@const subExpanded = appState.isSubgroupExpanded(sub.id, subTools.length > 0)}
                 <button
                   class="sub-header"
                   class:active={subgroupActive(sub.id)}
-                  onclick={() => appState.selectSubgroup(sub.id)}
+                  onclick={() => appState.toggleSubgroup(sub.id)}
                 >
+                  <span class="sub-chevron">
+                    {#if subExpanded}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}
+                  </span>
                   <span class="sub-label">{appState.lang === 'zh' ? sub.label.zh : sub.label.en}</span>
                   <span class="sub-count">{subTools.length}</span>
                 </button>
+                {#if subExpanded}
+                  {#each subTools as tool (tool.id)}
+                    <button
+                      class="tool-row"
+                      class:active={appState.selectedTool?.id === tool.id}
+                      onclick={() => appState.openTool(tool)}
+                    >
+                      <span class="tool-name">{tool.name}</span>
+                    </button>
+                  {/each}
+                {/if}
               {/if}
             {/each}
             <!-- 未归入子分类的工具(兜底) -->
@@ -160,7 +193,7 @@
     background: transparent;
     border: none;
     color: var(--ntx-fg);
-    font-size: 13px;
+    font-size: var(--ntx-text-base);
   }
   .search::placeholder {
     color: var(--ntx-fg-subtle);
@@ -177,6 +210,19 @@
   .clear:hover {
     color: var(--ntx-fg);
   }
+  .expand-btn {
+    display: inline-flex;
+    background: transparent;
+    border: none;
+    color: var(--ntx-fg-subtle);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: var(--ntx-radius-sm);
+  }
+  .expand-btn:hover {
+    color: var(--ntx-fg);
+    background: var(--ntx-surface-2);
+  }
   .tree {
     flex: 1;
     overflow-y: auto;
@@ -187,7 +233,7 @@
     display: flex;
     align-items: center;
     gap: var(--ntx-space-1);
-    font-size: 11px;
+    font-size: var(--ntx-text-xs);
     color: var(--ntx-fg-subtle);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -204,7 +250,7 @@
     padding: var(--ntx-space-2) var(--ntx-space-2);
     border-radius: var(--ntx-radius-sm);
     cursor: pointer;
-    font-size: 11px;
+    font-size: var(--ntx-text-sm);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-top: var(--ntx-space-2);
@@ -215,7 +261,7 @@
   .sub-header {
     display: flex;
     align-items: center;
-    gap: var(--ntx-space-2);
+    gap: var(--ntx-space-1);
     width: 100%;
     background: transparent;
     border: none;
@@ -223,7 +269,7 @@
     padding: var(--ntx-space-1) var(--ntx-space-2) var(--ntx-space-1) var(--ntx-space-4);
     border-radius: var(--ntx-radius-sm);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--ntx-text-base);
     transition: background var(--ntx-transition), color var(--ntx-transition);
   }
   .sub-header:hover {
@@ -231,22 +277,25 @@
     color: var(--ntx-fg);
   }
   .sub-header.active {
-    background: var(--ntx-primary-soft);
-    color: var(--ntx-primary);
+    color: var(--ntx-fg);
     font-weight: 500;
+  }
+  .sub-chevron {
+    display: inline-flex;
+    color: var(--ntx-fg-subtle);
+    flex-shrink: 0;
   }
   .sub-label {
     flex: 1;
     text-align: left;
   }
   .sub-count {
-    font-size: 10px;
+    font-size: var(--ntx-text-xs);
     color: var(--ntx-fg-subtle);
   }
-  .cat-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+  .group-icon {
+    display: inline-flex;
+    align-items: center;
     flex-shrink: 0;
   }
   .group-label {
@@ -254,7 +303,7 @@
     text-align: left;
   }
   .group-count {
-    font-size: 10px;
+    font-size: var(--ntx-text-xs);
     color: var(--ntx-fg-subtle);
   }
   .chevron {
@@ -271,7 +320,7 @@
     padding: var(--ntx-space-2) var(--ntx-space-2) var(--ntx-space-2) var(--ntx-space-5);
     border-radius: var(--ntx-radius-sm);
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--ntx-text-base);
     transition: background var(--ntx-transition), color var(--ntx-transition);
   }
   .tool-row:hover {
@@ -291,7 +340,7 @@
     border-top: 1px solid var(--ntx-border);
   }
   .engines-label {
-    font-size: 10px;
+    font-size: var(--ntx-text-xs);
     color: var(--ntx-fg-subtle);
     margin-right: var(--ntx-space-1);
   }
@@ -312,10 +361,7 @@
     justify-content: space-between;
     padding: var(--ntx-space-2) var(--ntx-space-3);
     border-top: 1px solid var(--ntx-border);
-    font-size: 11px;
+    font-size: var(--ntx-text-xs);
     color: var(--ntx-fg-subtle);
-  }
-  .local-badge {
-    color: var(--ntx-success);
   }
 </style>

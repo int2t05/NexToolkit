@@ -29,6 +29,7 @@
     border-radius: var(--ntx-radius-lg);
     overflow: hidden;
     box-shadow: var(--ntx-shadow-md);
+    height: 100%;
   }
   .input-header {
     display: flex;
@@ -64,8 +65,8 @@
     padding: var(--ntx-space-3);
     font-family: var(--ntx-font-mono);
     font-size: 13px;
-    resize: vertical;
-    min-height: 200px;
+    resize: none;
+    min-height: 120px;
   }
   .input-area::placeholder {
     color: var(--ntx-fg-subtle);

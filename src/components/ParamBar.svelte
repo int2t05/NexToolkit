@@ -1,7 +1,7 @@
 <script lang="ts">
   import { appState } from '../lib/state.svelte';
   import { joinFileNames } from '../lib/format';
-  import { FolderOpen } from '@lucide/svelte';
+  import { FolderOpen, Folder } from '@lucide/svelte';
   import type { ToolMetaDto } from '../lib/types';
 
   let { tool }: { tool: ToolMetaDto } = $props();
@@ -21,10 +21,16 @@
             {/each}
           </select>
         {:else if p.kind === 'file'}
-          <button class="file-pick" onclick={() => appState.pickFile(p.key, p.multiple)}>
-            <FolderOpen size={14} />
-            {appState.t('选择', 'Pick')}{p.multiple ? ` (${appState.t('多', 'multi')})` : ''}
-          </button>
+          <div class="file-row">
+            <button class="file-pick" onclick={() => appState.pickFile(p.key, p.multiple, false)}>
+              <FolderOpen size={14} />
+              {appState.t('选文件', 'Files')}{p.multiple ? ` (${appState.t('多', 'multi')})` : ''}
+            </button>
+            <button class="file-pick" onclick={() => appState.pickFile(p.key, true, true)} title={appState.t('选文件夹', 'Pick folder')}>
+              <Folder size={14} />
+              {appState.t('文件夹', 'Folder')}
+            </button>
+          </div>
           {#if joinFileNames(appState.files[p.key] ?? [])}
             <span class="file-name">{joinFileNames(appState.files[p.key] ?? [])}</span>
           {/if}
@@ -72,6 +78,10 @@
   .param select:focus-visible,
   .param textarea:focus-visible {
     border-color: var(--ntx-primary);
+  }
+  .file-row {
+    display: flex;
+    gap: var(--ntx-space-1);
   }
   .file-pick {
     display: inline-flex;

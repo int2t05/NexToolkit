@@ -1,12 +1,37 @@
 <script lang="ts">
   import { appState } from '../lib/state.svelte';
-  import { Command, Languages } from '@lucide/svelte';
+  import { Command, Languages, Wrench, Sun, Moon, Monitor } from '@lucide/svelte';
+  import logoUrl from '../assets/logo.svg';
 </script>
 
 <header class="topbar">
-  <div class="brand">NexToolkit</div>
+  <div class="brand">
+    <img src={logoUrl} alt="NexToolkit" class="brand-logo" />
+    <span>NexToolkit</span>
+  </div>
   <div class="badge">100% {appState.t('本地', 'Local')} · {appState.t('文件不离本机', 'Files never leave')}</div>
   <div class="spacer"></div>
+  <button
+    class="icon-btn"
+    onclick={() => appState.toggleTheme()}
+    title={appState.t(
+      appState.theme === 'auto' ? '跟随系统' : appState.theme === 'light' ? '明色' : '暗色',
+      appState.theme === 'auto' ? 'Auto' : appState.theme === 'light' ? 'Light' : 'Dark',
+    )}
+  >
+    {#if appState.theme === 'auto'}<Monitor size={16} />
+    {:else if appState.theme === 'light'}<Sun size={16} />
+    {:else}<Moon size={16} />{/if}
+  </button>
+  <button
+    class="icon-btn"
+    class:active={appState.selectedView === 'engines'}
+    onclick={() => appState.toggleEngineManager()}
+    title={appState.t('引擎管理', 'Engine manager')}
+  >
+    <Wrench size={16} />
+    {appState.t('引擎', 'Engines')}
+  </button>
   <button
     class="icon-btn"
     onclick={() => appState.togglePalette()}
@@ -31,9 +56,17 @@
     border-bottom: 1px solid var(--ntx-border);
   }
   .brand {
+    display: flex;
+    align-items: center;
+    gap: var(--ntx-space-2);
     font-weight: 700;
-    font-size: 18px;
+    font-size: var(--ntx-text-lg);
     color: var(--ntx-fg);
+  }
+  .brand-logo {
+    width: 24px;
+    height: 24px;
+    color: var(--ntx-primary);
   }
   .badge {
     font-size: var(--ntx-text-sm);
@@ -60,9 +93,14 @@
     background: var(--ntx-surface-2);
     color: var(--ntx-fg);
   }
+  .icon-btn.active {
+    background: var(--ntx-primary-soft);
+    color: var(--ntx-primary);
+    border-color: color-mix(in oklch, var(--ntx-primary) 30%, var(--ntx-border));
+  }
   kbd {
     font-family: var(--ntx-font-mono);
-    font-size: 10px;
+    font-size: var(--ntx-text-xs);
     background: var(--ntx-bg);
     padding: 1px var(--ntx-space-1);
     border-radius: var(--ntx-radius-sm);

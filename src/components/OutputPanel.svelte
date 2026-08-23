@@ -148,6 +148,7 @@
     border-radius: var(--ntx-radius-lg);
     overflow: hidden;
     box-shadow: var(--ntx-shadow-md);
+    height: 100%;
   }
   .output-header {
     display: flex;
@@ -182,6 +183,7 @@
     font-size: 13px;
     white-space: pre-wrap;
     word-break: break-all;
-    max-height: 400px;
+    flex: 1;
+    min-height: 0;
   }
 </style>

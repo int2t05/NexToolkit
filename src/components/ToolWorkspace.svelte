@@ -1,19 +1,11 @@
 <script lang="ts">
   import { appState } from '../lib/state.svelte';
-  import { GROUPS, GROUP_LABEL, SUBGROUPS } from '../lib/types';
-  import { Star, Play, Copy, Check, ArrowLeftRight, Trash2 } from '@lucide/svelte';
-  import ToolTabs from './ToolTabs.svelte';
+  import { GROUP_LABEL, SUBGROUPS } from '../lib/types';
+  import { Star, Play, ArrowLeftRight, Trash2 } from '@lucide/svelte';
   import ModeTabs from './ModeTabs.svelte';
   import ParamBar from './ParamBar.svelte';
   import SharedInput from './SharedInput.svelte';
   import OutputPanel from './OutputPanel.svelte';
-
-  // 当前子分类的工具列表(tab 用)
-  const subgroupTools = $derived.by(() => {
-    const sg = appState.selectedSubgroup;
-    if (!sg || !appState.selectedTool) return [];
-    return appState.toolsInSubgroup(sg);
-  });
 
   // 面包屑:group label / subgroup label
   const crumb = $derived.by(() => {
@@ -53,10 +45,6 @@
         <Star size={18} />
       </button>
     </div>
-
-    {#if subgroupTools.length > 1}
-      <ToolTabs tools={subgroupTools} />
-    {/if}
 
     <div class="mode-row">
       <ModeTabs />
@@ -108,6 +96,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--ntx-space-3);
+    height: 100%;
   }
   .crumb {
     display: flex;
@@ -172,8 +161,10 @@
   .io-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
     gap: var(--ntx-space-3);
-    min-height: 300px;
+    flex: 1;
+    min-height: 0;
   }
   .actions {
     display: flex;

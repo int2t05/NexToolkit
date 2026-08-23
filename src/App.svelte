@@ -6,8 +6,12 @@
   import ToolWorkspace from './components/ToolWorkspace.svelte';
   import EmptyState from './components/EmptyState.svelte';
   import CommandPalette from './components/CommandPalette.svelte';
+  import EngineManager from './components/EngineManager.svelte';
+
+  const showEngines = $derived(appState.selectedView === 'engines');
 
   onMount(() => {
+    appState.applyTheme();
     appState.loadTools();
   });
 
@@ -23,7 +27,9 @@
   <TopBar />
   <main class="layout">
     <Sidebar />
-    {#if noResults}
+    {#if showEngines}
+      <EngineManager />
+    {:else if noResults}
       <EmptyState />
     {:else}
       <ToolWorkspace />
@@ -41,7 +47,7 @@
   }
   .layout {
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: 240px 1fr;
     flex: 1;
     min-height: 0;
   }
